@@ -786,7 +786,6 @@ function renderContratos(){
 }
 function openFormContrato(c){
   document.getElementById('ctId').value=c?c.id:'';
-  document.getElementById('ctId').value=c?c.id:'';
   document.getElementById('ctCliente').innerHTML=db.clientes.map(x=>`<option value="${x.id}"${c&&c.clienteId===x.id?' selected':''}>${x.nombre}</option>`).join('');
   document.getElementById('ctLavadora').innerHTML=db.lavadoras.map(x=>`<option value="${x.id}"${c&&c.lavadoraId===x.id?' selected':''}>${x.num} · ${x.marca} (${x.estado})</option>`).join('');
   document.getElementById('ctInicio').value=c?c.inicio:today(); document.getElementById('ctTipo').value=c?c.tipo:'Mensual';
