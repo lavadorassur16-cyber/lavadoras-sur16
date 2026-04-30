@@ -1083,6 +1083,9 @@ async function init(){
     } catch(e){
       localStorage.removeItem(LS_TOKEN); localStorage.removeItem(LS_RTOKEN);
     }
+      }
+  document.getElementById('loginScreen').classList.add('show');
+}
 
   try {
     const data = await cloudLoad();
