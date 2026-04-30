@@ -1,1 +1,918 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lavadoras Sur 16</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#F0F4FA;--surface:#FFFFFF;--surface2:#EEF2FA;--border:#DDE3F0;
+  --accent:#3B6FE0;--accent2:#10B981;--warn:#F59E0B;--danger:#EF4444;
+  --text:#1A1F36;--muted:#6B7BA4;--light:#A8B5CC;
+  --shadow:0 1px 4px rgba(59,111,224,.07);
+}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:13px;min-height:100vh;display:flex;flex-direction:column}
+.topbar{height:56px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;padding:0 16px;position:sticky;top:0;z-index:100;box-shadow:var(--shadow)}
+.menu-btn{background:none;border:none;cursor:pointer;font-size:20px;padding:4px 8px;color:var(--muted);border-radius:7px}
+.menu-btn:hover{background:var(--surface2)}
+.logo-title{font-size:15px;font-weight:800;color:var(--text)}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.topbar-date{font-size:11px;color:var(--muted)}
+.app{display:flex;flex:1;min-height:0}
+.sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:56px;left:0;bottom:0;z-index:90;transition:transform .25s ease;overflow-y:auto}
+.sidebar.closed{transform:translateX(-100%)}
+.overlay{display:none;position:fixed;inset:0;top:56px;background:rgba(0,0,0,.35);z-index:89}
+.overlay.show{display:block}
+.main-wrap{flex:1;padding:18px 16px;overflow-y:auto;transition:margin-left .25s ease}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 18px;cursor:pointer;border-left:3px solid transparent;color:var(--muted);font-size:13px;font-weight:500;transition:all .15s}
+.nav-item:hover{background:var(--surface2);color:var(--text)}
+.nav-item.active{border-left-color:var(--accent);background:var(--surface2);color:var(--accent);font-weight:700}
+.nav-icon{font-size:16px;width:20px;text-align:center}
+.sidebar-bottom{padding:14px 16px;border-top:1px solid var(--border);margin-top:auto}
+.db-status{font-size:10px;color:var(--muted);margin-bottom:8px}
+.db-ok{color:var(--accent2);font-weight:600}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:16px;box-shadow:var(--shadow)}
+.card-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.card-title{font-size:14px;font-weight:700;color:var(--text)}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px;position:relative;overflow:hidden;box-shadow:var(--shadow);border-top:3px solid var(--accent)}
+.stat-card.green{border-top-color:var(--accent2)}.stat-card.yellow{border-top-color:var(--warn)}.stat-card.red{border-top-color:var(--danger)}
+.stat-label{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:6px;font-weight:600}
+.stat-value{font-size:28px;font-weight:800;color:var(--text);line-height:1}
+.stat-sub{font-size:11px;color:var(--muted);margin-top:5px}
+.stat-icon{position:absolute;right:16px;top:14px;font-size:24px;opacity:.12}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:400px}
+th{background:var(--surface2);padding:9px 14px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);border-bottom:1px solid var(--border);font-weight:700;white-space:nowrap}
+td{padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#F7F9FF}
+.action-btn{background:none;border:none;cursor:pointer;font-size:14px;padding:3px 6px;border-radius:6px;transition:background .1s}
+.action-btn:hover{background:var(--surface2)}
+.badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:600;letter-spacing:.03em}
+.bg{background:#DBEAFE;color:#1D4ED8;border:1px solid #93C5FD}
+.gg{background:#DCFCE7;color:#15803D;border:1px solid #86EFAC}
+.gy{background:#FEF3C7;color:#B45309;border:1px solid #FCD34D}
+.gr{background:#FEE2E2;color:#B91C1C;border:1px solid #FCA5A5}
+.gx{background:#F1F5F9;color:#64748B;border:1px solid #CBD5E1}
+.btn{display:inline-flex;align-items:center;gap:6px;border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;border-radius:9px;padding:9px 16px;transition:all .15s}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:#2d5ec7}
+.btn-success{background:var(--accent2);color:#fff}.btn-success:hover{background:#0ea471}
+.btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border)}.btn-secondary:hover{background:var(--border)}
+.btn-ghost{background:transparent;color:var(--danger);border:1px solid #FECACA;font-size:11px;padding:6px 12px}
+.btn-sm{padding:6px 12px;font-size:12px}
+.filters{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.search-box{flex:1;min-width:160px;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;transition:border .15s;font-family:inherit}
+.search-box:focus{border-color:var(--accent)}
+.filter-select{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:9px 12px;color:var(--text);font-size:13px;font-family:inherit;cursor:pointer;outline:none}
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(26,31,54,.45);z-index:200;align-items:center;justify-content:center;padding:14px}
+.modal-bg.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:18px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.15)}
+.modal-header{padding:18px 22px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.modal-title{font-size:16px;font-weight:700}
+.modal-close{background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);line-height:1}
+.modal-body{padding:22px}
+.modal-footer{padding:14px 22px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.form-group{display:flex;flex-direction:column;gap:5px}
+.form-group.full{grid-column:1/-1}
+.form-label{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700}
+.form-input,.form-select,.form-textarea{background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:9px 12px;color:var(--text);font-size:13px;font-family:inherit;outline:none;width:100%;transition:border .15s}
+.form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--accent)}
+.form-textarea{resize:vertical;min-height:70px}
+.tab-bar{display:flex;border-bottom:1px solid var(--border);margin-bottom:16px}
+.tab-btn{background:none;border:none;border-bottom:2px solid transparent;padding:10px 16px;color:var(--muted);font-size:13px;cursor:pointer;font-weight:500;margin-bottom:-1px;transition:all .15s;font-family:inherit}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:700}
+.bar-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.bar-label{width:90px;font-size:11px;color:var(--muted);text-align:right;flex-shrink:0}
+.bar-track{flex:1;height:10px;background:var(--surface2);border-radius:5px;overflow:hidden}
+.bar-fill{height:100%;border-radius:5px;transition:width .8s ease}
+.bar-val{width:70px;font-size:11px;font-weight:600;color:var(--text)}
+.two-col{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-bottom:16px}
+.detail-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px}
+.detail-row .dk{color:var(--muted)}.detail-row .dv{font-weight:500}
+.summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;background:var(--surface2);border-radius:10px;padding:14px;margin-bottom:16px;text-align:center}
+.sum-val{font-size:20px;font-weight:800;line-height:1.2}
+.sum-label{font-size:10px;color:var(--muted);margin-top:2px}
+.toast-wrap{position:fixed;bottom:18px;right:18px;z-index:999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:11px 16px;font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,.1);display:flex;gap:8px;align-items:center;max-width:280px;animation:tIn .3s ease}
+.toast.s{border-left:4px solid var(--accent2)}.toast.e{border-left:4px solid var(--danger)}.toast.i{border-left:4px solid var(--accent)}
+@keyframes tIn{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:none}}
+.empty{text-align:center;padding:36px 20px;color:var(--muted)}
+.empty-icon{font-size:36px;margin-bottom:8px}
+.loading{display:flex;align-items:center;justify-content:center;height:200px;flex-direction:column;gap:12px;color:var(--muted)}
+.spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.info-box{background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 14px;font-size:13px;line-height:1.7;margin-bottom:4px}
+.saving-indicator{position:fixed;top:60px;right:12px;font-size:11px;color:var(--muted);background:var(--surface);border:1px solid var(--border);padding:4px 10px;border-radius:20px;z-index:99;display:none}
+@media(max-width:700px){
+  .sidebar{top:56px}
+  .form-grid{grid-template-columns:1fr}
+  .topbar-date{display:none}
+  .stat-value{font-size:22px}
+}
+</style>
+</head>
+<body>
 
+<div class="topbar">
+  <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+  <span style="font-size:18px;margin-right:4px">🌀</span>
+  <span class="logo-title">Lavadoras Sur 16</span>
+  <div class="topbar-right">
+    <span class="topbar-date" id="topDate"></span>
+    <button class="btn btn-primary btn-sm" onclick="nuevoBtn()">+ Nuevo</button>
+  </div>
+</div>
+
+<div class="saving-indicator" id="savingIndicator">💾 Guardando…</div>
+
+<div class="app">
+  <div class="overlay" id="overlay" onclick="closeSidebar()"></div>
+  <nav class="sidebar closed" id="sidebar">
+    <div id="navItems"></div>
+    <div class="sidebar-bottom">
+      <div class="db-status">Base de datos: <span id="dbStatusLabel">Conectando…</span></div>
+      <button class="btn btn-ghost" onclick="resetData()" style="width:100%;justify-content:center;margin-top:4px">🗑 Restablecer datos</button>
+    </div>
+  </nav>
+  <div class="main-wrap" id="mainWrap" style="margin-left:0">
+    <div id="pageContent"><div class="loading"><div class="spinner"></div><span>Cargando datos…</span></div></div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<!-- MODAL CLIENTE -->
+<div class="modal-bg" id="modal-cliente">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title" id="mCliTitle">Nuevo cliente</div><button class="modal-close" onclick="closeModal('modal-cliente')">×</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <input type="hidden" id="cId">
+        <div class="form-group"><label class="form-label">Nombre *</label><input class="form-input" id="cNombre" placeholder="Nombre completo"></div>
+        <div class="form-group"><label class="form-label">Teléfono *</label><input class="form-input" id="cTel" placeholder="55 1234 5678"></div>
+        <div class="form-group full"><label class="form-label">Dirección</label><input class="form-input" id="cDir" placeholder="Calle, colonia, municipio"></div>
+        <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="cEmail" type="email" placeholder="correo@ejemplo.com"></div>
+        <div class="form-group"><label class="form-label">Estado</label><select class="form-select" id="cEstado"><option>Activo</option><option>Inactivo</option></select></div>
+        <div class="form-group full"><label class="form-label">Notas</label><textarea class="form-textarea" id="cNotas" rows="2"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('modal-cliente')">Cancelar</button><button class="btn btn-primary" onclick="guardarCliente()">Guardar</button></div>
+  </div>
+</div>
+
+<!-- MODAL CONTRATO -->
+<div class="modal-bg" id="modal-contrato">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title" id="mContTitle">Nuevo contrato</div><button class="modal-close" onclick="closeModal('modal-contrato')">×</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <input type="hidden" id="ctId">
+        <div class="form-group full"><label class="form-label">Cliente *</label><select class="form-select" id="ctCliente"></select></div>
+        <div class="form-group full"><label class="form-label">Lavadora *</label><select class="form-select" id="ctLavadora"></select></div>
+        <div class="form-group"><label class="form-label">Fecha inicio *</label><input class="form-input" type="date" id="ctInicio"></div>
+        <div class="form-group"><label class="form-label">Tipo de pago</label><select class="form-select" id="ctTipo"><option>Mensual</option><option>Semanal</option></select></div>
+        <div class="form-group"><label class="form-label">Monto renta *</label><input class="form-input" type="number" id="ctMonto" placeholder="$0.00"></div>
+        <div class="form-group"><label class="form-label">Estado</label><select class="form-select" id="ctEstado"><option>Activo</option><option>Suspendido</option><option>Finalizado</option></select></div>
+        <div class="form-group full"><label class="form-label">Dirección instalación</label><input class="form-input" id="ctDir"></div>
+        <div class="form-group full"><label class="form-label">Notas</label><textarea class="form-textarea" id="ctNotas" rows="2"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('modal-contrato')">Cancelar</button><button class="btn btn-primary" onclick="guardarContrato()">Guardar</button></div>
+  </div>
+</div>
+
+<!-- MODAL LAVADORA -->
+<div class="modal-bg" id="modal-lavadora">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title" id="mLavTitle">Nueva lavadora</div><button class="modal-close" onclick="closeModal('modal-lavadora')">×</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <input type="hidden" id="lId">
+        <div class="form-group"><label class="form-label">ID / Número *</label><input class="form-input" id="lNum" placeholder="LAV-001"></div>
+        <div class="form-group"><label class="form-label">Marca *</label><input class="form-input" id="lMarca" placeholder="Mabe, Samsung..."></div>
+        <div class="form-group"><label class="form-label">Modelo</label><input class="form-input" id="lModelo" placeholder="WH1234"></div>
+        <div class="form-group"><label class="form-label">Capacidad (kg)</label><input class="form-input" type="number" id="lCap" placeholder="16"></div>
+        <div class="form-group"><label class="form-label">Estado</label><select class="form-select" id="lEstado"><option>Disponible</option><option>Rentada</option><option>Mantenimiento</option></select></div>
+        <div class="form-group"><label class="form-label">Año</label><input class="form-input" type="number" id="lAnio" placeholder="2022"></div>
+        <div class="form-group full"><label class="form-label">Notas</label><textarea class="form-textarea" id="lNotas" rows="2"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('modal-lavadora')">Cancelar</button><button class="btn btn-primary" onclick="guardarLavadora()">Guardar</button></div>
+  </div>
+</div>
+
+<!-- MODAL DETALLE -->
+<div class="modal-bg" id="modal-detalle">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title" id="mDetTitle">Detalle</div><button class="modal-close" onclick="closeModal('modal-detalle')">×</button></div>
+    <div class="modal-body" id="mDetBody"></div>
+    <div class="modal-footer" id="mDetFoot"><button class="btn btn-secondary" onclick="closeModal('modal-detalle')">Cerrar</button></div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+//  CONFIG — Supabase
+// ══════════════════════════════════════════════
+const SUPA_URL = 'https://knotphklpyvzzzndkknu.supabase.co/rest/v1/lavadoras_db';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtub3RwaGtscHl2enp6bmRra251Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwNzQ3NzQsImV4cCI6MjA5MjY1MDc3NH0.l7d7HH04rhHdJFmROGyp-QAU26AnELMux2JkPsXNkfU';
+const LS_KEY   = 'lavSur16_db';
+
+const HEADERS = {
+  'Content-Type':  'application/json',
+  'apikey':        SUPA_KEY,
+  'Authorization': 'Bearer ' + SUPA_KEY,
+  'Prefer':        'return=minimal'
+};
+
+let db          = { clientes:[], lavadoras:[], contratos:[], pagos:[] };
+let usingCloud  = false;
+let saving      = false;
+let currentPage = 'dashboard';
+
+// ══════════════════════════════════════════════
+//  SUPABASE — load / save
+// ══════════════════════════════════════════════
+async function cloudLoad() {
+  const r = await fetch(SUPA_URL + '?id=eq.main&select=data', {
+    headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY }
+  });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const j = await r.json();
+  if (!j.length) throw new Error('empty');
+  return j[0].data;
+}
+
+async function cloudSave() {
+  if (saving) return;
+  saving = true;
+  document.getElementById('savingIndicator').style.display = 'block';
+  try {
+    const r = await fetch(SUPA_URL + '?id=eq.main', {
+      method:  'PATCH',
+      headers: HEADERS,
+      body:    JSON.stringify({ data: db, updated_at: new Date().toISOString() })
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+  } catch(e) {
+    console.error('cloudSave error:', e);
+    toast('Error al guardar en la nube — revisa la conexión','e');
+  }
+  saving = false;
+  document.getElementById('savingIndicator').style.display = 'none';
+}
+
+// ══════════════════════════════════════════════
+//  LOCAL STORAGE — fallback
+// ══════════════════════════════════════════════
+function lsSave() { try { localStorage.setItem(LS_KEY, JSON.stringify(db)); } catch(e){} }
+function lsLoad() {
+  try { const r = localStorage.getItem(LS_KEY); if(r){ db = JSON.parse(r); return true; } } catch(e){}
+  return false;
+}
+
+// ══════════════════════════════════════════════
+//  PERSIST — guarda local + nube
+// ══════════════════════════════════════════════
+async function persist() {
+  lsSave();
+  if (usingCloud) await cloudSave();
+}
+
+// ══════════════════════════════════════════════
+//  UTILS
+// ══════════════════════════════════════════════
+const fmtDate = d => d instanceof Date ? d.toISOString().split('T')[0] : d;
+const today   = () => fmtDate(new Date());
+const fmtMXN  = n  => '$' + Number(n).toLocaleString('es-MX');
+const nextId  = a  => a.length ? Math.max(...a.map(x=>x.id))+1 : 1;
+const qs      = s  => document.querySelector(s);
+
+function proximaFecha(c) {
+  const ps = [...db.pagos].filter(p=>p.contratoId===c.id).sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
+  const base = ps.length ? new Date(ps[0].fecha) : new Date(c.inicio);
+  const n = new Date(base);
+  c.tipo==='Mensual' ? n.setMonth(n.getMonth()+1) : n.setDate(n.getDate()+7);
+  return fmtDate(n);
+}
+function badge(t,c){ return `<span class="badge ${c}">${t}</span>`; }
+function stBadge(e){ return e==='Activo'||e==='Disponible'?badge(e,'gg'):e==='Rentada'?badge(e,'bg'):e==='Mantenimiento'?badge(e,'gy'):e==='Suspendido'?badge(e,'gy'):badge(e,'gx'); }
+
+// ══════════════════════════════════════════════
+//  TOAST
+// ══════════════════════════════════════════════
+function toast(msg, type='s') {
+  const w = document.getElementById('toastWrap');
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.innerHTML = `<span>${type==='s'?'✓':type==='e'?'✕':'ℹ'}</span>${msg}`;
+  w.appendChild(t);
+  setTimeout(()=>t.remove(), 4000);
+}
+
+// ══════════════════════════════════════════════
+//  STATUS
+// ══════════════════════════════════════════════
+function updateStatus() {
+  const el = document.getElementById('dbStatusLabel');
+  el.innerHTML = usingCloud
+    ? '<span class="db-ok">Supabase ☁️ activo</span>'
+    : '<span style="color:var(--warn);font-weight:600">Solo local 💾</span>';
+}
+
+// ══════════════════════════════════════════════
+//  SEED
+// ══════════════════════════════════════════════
+function seed() {
+  const d = new Date();
+  const mo = (y,m,day) => fmtDate(new Date(y,m,day));
+  db = {
+    clientes:[
+      {id:1,nombre:'María González',tel:'55 8823 1100',dir:'Calle Reforma 45, Iztapalapa',email:'maria@email.com',estado:'Activo',notas:''},
+      {id:2,nombre:'Juan Ramírez',tel:'55 3311 7890',dir:'Av. Tláhuac 220',email:'',estado:'Activo',notas:'Paga puntual'},
+      {id:3,nombre:'Rosa Hernández',tel:'55 6600 4455',dir:'Sur 16 col. Xochimilco',email:'rosa@mail.com',estado:'Activo',notas:''},
+      {id:4,nombre:'Carlos Mendoza',tel:'55 9977 2200',dir:'Calzada de la Viga 80',email:'',estado:'Inactivo',notas:'Contrato finalizado'},
+      {id:5,nombre:'Elena Torres',tel:'55 4422 6611',dir:'Oriente 234, Iztapalapa',email:'elena@email.com',estado:'Activo',notas:''},
+    ],
+    lavadoras:[
+      {id:1,num:'LAV-001',marca:'Mabe',modelo:'WH16X',cap:16,estado:'Rentada',anio:2021,notas:''},
+      {id:2,num:'LAV-002',marca:'Mabe',modelo:'WH14X',cap:14,estado:'Rentada',anio:2022,notas:''},
+      {id:3,num:'LAV-003',marca:'Samsung',modelo:'WA4000',cap:18,estado:'Disponible',anio:2023,notas:''},
+      {id:4,num:'LAV-004',marca:'LG',modelo:'WT7305C',cap:20,estado:'Rentada',anio:2020,notas:''},
+      {id:5,num:'LAV-005',marca:'Whirlpool',modelo:'WTW5000DW',cap:16,estado:'Mantenimiento',anio:2019,notas:'Revisión de bomba'},
+      {id:6,num:'LAV-006',marca:'Mabe',modelo:'WH16X',cap:16,estado:'Disponible',anio:2023,notas:''},
+      {id:7,num:'LAV-007',marca:'Samsung',modelo:'WA5000',cap:18,estado:'Rentada',anio:2022,notas:''},
+    ],
+    contratos:[
+      {id:1,clienteId:1,lavadoraId:1,inicio:'2025-01-15',tipo:'Mensual',monto:550,estado:'Activo',dir:'Misma del cliente',notas:''},
+      {id:2,clienteId:2,lavadoraId:2,inicio:'2025-03-01',tipo:'Semanal',monto:150,estado:'Activo',dir:'Misma del cliente',notas:''},
+      {id:3,clienteId:3,lavadoraId:4,inicio:'2024-11-20',tipo:'Mensual',monto:600,estado:'Activo',dir:'Misma del cliente',notas:''},
+      {id:4,clienteId:5,lavadoraId:7,inicio:'2025-05-01',tipo:'Semanal',monto:130,estado:'Activo',dir:'Misma del cliente',notas:''},
+      {id:5,clienteId:4,lavadoraId:3,inicio:'2024-06-01',tipo:'Mensual',monto:500,estado:'Finalizado',dir:'Calzada de la Viga 80',notas:''},
+    ],
+    pagos:[
+      {id:1,contratoId:1,fecha:mo(d.getFullYear(),d.getMonth(),3),monto:550,metodo:'Efectivo',periodo:'Julio 2025',notas:''},
+      {id:2,contratoId:2,fecha:mo(d.getFullYear(),d.getMonth(),1),monto:150,metodo:'Transferencia',periodo:'Semana 1',notas:''},
+      {id:3,contratoId:3,fecha:mo(d.getFullYear(),d.getMonth(),5),monto:600,metodo:'Efectivo',periodo:'Julio 2025',notas:''},
+      {id:4,contratoId:2,fecha:mo(d.getFullYear(),d.getMonth(),8),monto:150,metodo:'Efectivo',periodo:'Semana 2',notas:''},
+    ]
+  };
+}
+
+async function resetData() {
+  if (!confirm('¿Restablecer todos los datos de ejemplo? Se perderán los cambios actuales.')) return;
+  seed();
+  await persist();
+  renderPage();
+  toast('Datos restablecidos','i');
+}
+
+// ══════════════════════════════════════════════
+//  NAV
+// ══════════════════════════════════════════════
+const PAGES = [
+  {id:'dashboard',icon:'⊞',label:'Dashboard'},
+  {id:'clientes', icon:'👤',label:'Clientes'},
+  {id:'contratos',icon:'📋',label:'Contratos'},
+  {id:'lavadoras',icon:'🌀',label:'Inventario'},
+  {id:'pagos',    icon:'💰',label:'Pagos'},
+  {id:'reportes', icon:'📊',label:'Reportes'},
+];
+
+function buildNav() {
+  document.getElementById('navItems').innerHTML = PAGES.map(p=>`
+    <div class="nav-item${currentPage===p.id?' active':''}" onclick="goPage('${p.id}')">
+      <span class="nav-icon">${p.icon}</span>${p.label}
+    </div>`).join('');
+}
+function goPage(p){ currentPage=p; buildNav(); closeSidebar(); renderPage(); }
+function toggleSidebar(){
+  document.getElementById('sidebar').classList.toggle('closed');
+  document.getElementById('overlay').classList.toggle('show');
+}
+function closeSidebar(){
+  document.getElementById('sidebar').classList.add('closed');
+  document.getElementById('overlay').classList.remove('show');
+}
+function openModal(id){ document.getElementById(id).classList.add('open'); }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m) m.classList.remove('open'); }));
+
+function nuevoBtn(){
+  if(currentPage==='clientes')       openFormCliente();
+  else if(currentPage==='contratos') openFormContrato();
+  else if(currentPage==='lavadoras') openFormLavadora();
+  else if(currentPage==='pagos')     { activePagoTab='registrar'; renderPage(); }
+  else openFormCliente();
+}
+
+// ══════════════════════════════════════════════
+//  RENDER ROUTER
+// ══════════════════════════════════════════════
+function renderPage(){
+  buildNav();
+  const c = document.getElementById('pageContent');
+  if     (currentPage==='dashboard') c.innerHTML = renderDashboard();
+  else if(currentPage==='clientes')  c.innerHTML = renderClientes();
+  else if(currentPage==='contratos') c.innerHTML = renderContratos();
+  else if(currentPage==='lavadoras') c.innerHTML = renderLavadoras();
+  else if(currentPage==='pagos')     {
+    c.innerHTML = renderPagos();
+    if(window._pagoPresetId){ const s=qs('#pContrato'); if(s){s.value=window._pagoPresetId;updatePagoInfo();} }
+  }
+  else if(currentPage==='reportes')  c.innerHTML = renderReportes();
+}
+
+// ══════════════════════════════════════════════
+//  DASHBOARD
+// ══════════════════════════════════════════════
+function calcPendientes(){
+  const now = new Date();
+  return db.contratos.filter(c=>c.estado==='Activo').map(c=>{
+    const prox = proximaFecha(c);
+    const diff = Math.ceil((new Date(prox)-now)/86400000);
+    const status = diff<0?'Vencido':diff<=3?'Por vencer':'Al corriente';
+    const up = [...db.pagos].filter(p=>p.contratoId===c.id).sort((a,b)=>new Date(b.fecha)-new Date(a.fecha))[0];
+    return {...c,prox,diff,status,ultPago:up};
+  }).filter(c=>c.status!=='Al corriente');
+}
+
+function renderDashboard(){
+  const now=new Date(), m=now.getMonth(), y=now.getFullYear();
+  const cobrosMes = db.pagos.filter(p=>{const d=new Date(p.fecha);return d.getMonth()===m&&d.getFullYear()===y;}).reduce((s,p)=>s+p.monto,0);
+  const activos   = db.contratos.filter(c=>c.estado==='Activo');
+  const rentadas  = db.lavadoras.filter(l=>l.estado==='Rentada').length;
+  const totalLav  = db.lavadoras.length;
+  const disp      = db.lavadoras.filter(l=>l.estado==='Disponible').length;
+  const mant      = db.lavadoras.filter(l=>l.estado==='Mantenimiento').length;
+  const vencidos  = calcPendientes().filter(v=>v.status==='Vencido').length;
+  const activeCli = db.clientes.filter(c=>c.estado==='Activo').length;
+  const maxLav    = Math.max(rentadas,disp,mant,1);
+  const proxRows  = activos.slice(0,5).map(c=>{
+    const cli=db.clientes.find(x=>x.id===c.clienteId);
+    const prox=proximaFecha(c);
+    const diff=Math.ceil((new Date(prox)-now)/86400000);
+    const bc=diff<0?'gr':diff<=3?'gy':'gg';
+    const bl=diff<0?'Vencido':diff===0?'Hoy':`En ${diff}d`;
+    return`<tr><td style="font-weight:600">${cli?cli.nombre:'—'}</td><td style="color:var(--accent2);font-weight:600">${fmtMXN(c.monto)}</td><td>${prox}</td><td>${badge(bl,bc)}</td></tr>`;
+  }).join('');
+  const ultPagos  = [...db.pagos].reverse().slice(0,5).map(p=>{
+    const c=db.contratos.find(x=>x.id===p.contratoId);
+    const cli=c?db.clientes.find(x=>x.id===c.clienteId):null;
+    return`<tr><td>${p.fecha}</td><td>${cli?cli.nombre:'—'}</td><td style="color:var(--accent2);font-weight:600">${fmtMXN(p.monto)}</td><td>${badge(p.metodo,'gx')}</td></tr>`;
+  }).join('');
+  return`
+  <div class="stat-grid">
+    <div class="stat-card"><div class="stat-label">Clientes activos</div><div class="stat-value">${activeCli}</div><div class="stat-sub">contratos vigentes</div><div class="stat-icon">👤</div></div>
+    <div class="stat-card green"><div class="stat-label">Lavadoras rentadas</div><div class="stat-value">${rentadas}</div><div class="stat-sub">de ${totalLav} en inventario</div><div class="stat-icon">🌀</div></div>
+    <div class="stat-card yellow"><div class="stat-label">Cobros este mes</div><div class="stat-value" style="font-size:22px">${fmtMXN(cobrosMes)}</div><div class="stat-sub">pagos recibidos</div><div class="stat-icon">💰</div></div>
+    <div class="stat-card red"><div class="stat-label">Pagos vencidos</div><div class="stat-value">${vencidos}</div><div class="stat-sub">clientes con mora</div><div class="stat-icon">⚠️</div></div>
+  </div>
+  <div class="two-col">
+    <div class="card">
+      <div class="card-header"><div class="card-title">Próximos cobros</div>${badge('7 días','bg')}</div>
+      <div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Monto</th><th>Vence</th><th>Estado</th></tr></thead><tbody>${proxRows||'<tr><td colspan="4"><div class="empty">Sin contratos activos</div></td></tr>'}</tbody></table></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">Disponibilidad</div>${badge(disp+' disponibles','gg')}</div>
+      <div style="padding:18px">
+        <div class="bar-row"><div class="bar-label">Rentadas</div><div class="bar-track"><div class="bar-fill" style="width:${rentadas/maxLav*100}%;background:var(--accent)"></div></div><div class="bar-val">${rentadas}/${totalLav}</div></div>
+        <div class="bar-row"><div class="bar-label">Disponibles</div><div class="bar-track"><div class="bar-fill" style="width:${disp/maxLav*100}%;background:var(--accent2)"></div></div><div class="bar-val">${disp}/${totalLav}</div></div>
+        <div class="bar-row"><div class="bar-label">Mantenimiento</div><div class="bar-track"><div class="bar-fill" style="width:${mant/maxLav*100}%;background:var(--warn)"></div></div><div class="bar-val">${mant}/${totalLav}</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">Últimos pagos registrados</div></div>
+    <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Cliente</th><th>Monto</th><th>Método</th></tr></thead><tbody>${ultPagos||'<tr><td colspan="4"><div class="empty">Sin pagos</div></td></tr>'}</tbody></table></div>
+  </div>`;
+}
+
+// ══════════════════════════════════════════════
+//  CLIENTES
+// ══════════════════════════════════════════════
+function renderClientes(){
+  const q=( window._searchCli||'').toLowerCase(), est=window._filterCliEst||'';
+  const data=db.clientes.filter(c=>(!q||c.nombre.toLowerCase().includes(q)||c.tel.includes(q))&&(!est||c.estado===est));
+  const rows=data.map(c=>{
+    const nc=db.contratos.filter(x=>x.clienteId===c.id).length;
+    return`<tr><td style="font-weight:600">${c.nombre}</td><td>${c.tel}</td>
+      <td style="color:var(--muted)">${c.dir||'—'}</td>
+      <td>${badge(nc,'bg')}</td><td>${stBadge(c.estado)}</td>
+      <td><button class="action-btn" onclick="verCliente(${c.id})">👁</button>
+          <button class="action-btn" onclick="editCliente(${c.id})">✏️</button>
+          <button class="action-btn" onclick="delCliente(${c.id})">🗑</button></td></tr>`;
+  }).join('');
+  return`
+  <div class="filters">
+    <input class="search-box" placeholder="🔍 Buscar cliente…" value="${window._searchCli||''}" oninput="window._searchCli=this.value;renderPage()">
+    <select class="filter-select" onchange="window._filterCliEst=this.value;renderPage()">
+      <option value="">Todos</option><option${est==='Activo'?' selected':''}>Activo</option><option${est==='Inactivo'?' selected':''}>Inactivo</option>
+    </select>
+    <button class="btn btn-primary btn-sm" onclick="openFormCliente()">+ Nuevo cliente</button>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">Clientes registrados</div>${badge(data.length,'bg')}</div>
+    <div class="table-wrap"><table><thead><tr><th>Nombre</th><th>Teléfono</th><th>Dirección</th><th>Contratos</th><th>Estado</th><th></th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="6"><div class="empty"><div class="empty-icon">👤</div><p>Sin clientes</p></div></td></tr>'}</tbody></table></div>
+  </div>`;
+}
+function openFormCliente(c){
+  document.getElementById('cId').value    = c?c.id:'';
+  document.getElementById('cNombre').value= c?c.nombre:'';
+  document.getElementById('cTel').value   = c?c.tel:'';
+  document.getElementById('cDir').value   = c?c.dir:'';
+  document.getElementById('cEmail').value = c?c.email:'';
+  document.getElementById('cEstado').value= c?c.estado:'Activo';
+  document.getElementById('cNotas').value = c?c.notas:'';
+  document.getElementById('mCliTitle').textContent = c?'Editar cliente':'Nuevo cliente';
+  openModal('modal-cliente');
+}
+function editCliente(id){ openFormCliente(db.clientes.find(c=>c.id===id)); }
+async function guardarCliente(){
+  const id=document.getElementById('cId').value;
+  const nombre=document.getElementById('cNombre').value.trim();
+  const tel=document.getElementById('cTel').value.trim();
+  if(!nombre||!tel){ toast('Nombre y teléfono obligatorios','e'); return; }
+  const data={nombre,tel,dir:document.getElementById('cDir').value,email:document.getElementById('cEmail').value,notas:document.getElementById('cNotas').value,estado:document.getElementById('cEstado').value};
+  if(id){ db.clientes=db.clientes.map(c=>c.id==id?{...c,...data}:c); toast('Cliente actualizado'); }
+  else  { db.clientes.push({id:nextId(db.clientes),...data}); toast('Cliente registrado'); }
+  closeModal('modal-cliente'); await persist(); renderPage();
+}
+async function delCliente(id){
+  if(!confirm('¿Eliminar cliente y sus contratos?')) return;
+  db.clientes  = db.clientes.filter(c=>c.id!==id);
+  db.contratos = db.contratos.filter(c=>c.clienteId!==id);
+  await persist(); renderPage(); toast('Cliente eliminado','i');
+}
+function verCliente(id){
+  const c=db.clientes.find(x=>x.id===id); if(!c) return;
+  const cts=db.contratos.filter(x=>x.clienteId===id);
+  const total=db.pagos.filter(p=>cts.map(ct=>ct.id).includes(p.contratoId)).reduce((s,p)=>s+p.monto,0);
+  const np   =db.pagos.filter(p=>cts.map(ct=>ct.id).includes(p.contratoId)).length;
+  document.getElementById('mDetTitle').textContent=c.nombre;
+  document.getElementById('mDetBody').innerHTML=`
+    <div class="summary-grid">
+      <div><div class="sum-val" style="color:var(--accent)">${cts.length}</div><div class="sum-label">Contratos</div></div>
+      <div><div class="sum-val" style="color:var(--accent2)">${np}</div><div class="sum-label">Pagos</div></div>
+      <div><div class="sum-val" style="color:var(--warn);font-size:16px">${fmtMXN(total)}</div><div class="sum-label">Total</div></div>
+    </div>
+    ${[['Teléfono',c.tel],['Email',c.email||'—'],['Dirección',c.dir||'—'],['Estado',c.estado],['Notas',c.notas||'—']].map(([k,v])=>`<div class="detail-row"><span class="dk">${k}</span><span class="dv">${v}</span></div>`).join('')}`;
+  document.getElementById('mDetFoot').innerHTML=`<button class="btn btn-secondary" onclick="closeModal('modal-detalle')">Cerrar</button><button class="btn btn-primary" onclick="closeModal('modal-detalle');editCliente(${id})">Editar</button>`;
+  openModal('modal-detalle');
+}
+
+// ══════════════════════════════════════════════
+//  CONTRATOS
+// ══════════════════════════════════════════════
+function renderContratos(){
+  const q=(window._searchCt||'').toLowerCase(),est=window._filterCtEst||'',tipo=window._filterCtTipo||'';
+  const data=db.contratos.filter(c=>{
+    const cli=db.clientes.find(x=>x.id===c.clienteId);
+    return(!q||cli?.nombre.toLowerCase().includes(q)||String(c.id).includes(q))&&(!est||c.estado===est)&&(!tipo||c.tipo===tipo);
+  });
+  const rows=data.map(c=>{
+    const cli=db.clientes.find(x=>x.id===c.clienteId);
+    const lav=db.lavadoras.find(x=>x.id===c.lavadoraId);
+    const bc=c.estado==='Activo'?'gg':c.estado==='Suspendido'?'gy':'gx';
+    return`<tr><td style="color:var(--muted)">#${c.id}</td>
+      <td style="font-weight:600">${cli?cli.nombre:'—'}</td>
+      <td>${lav?lav.num+' · '+lav.marca:'—'}</td>
+      <td style="color:var(--accent2);font-weight:600">${fmtMXN(c.monto)}</td>
+      <td>${badge(c.tipo,'bg')}</td><td>${badge(c.estado,bc)}</td>
+      <td><button class="action-btn" onclick="verContrato(${c.id})">👁</button>
+          <button class="action-btn" onclick="editContrato(${c.id})">✏️</button>
+          <button class="action-btn" onclick="delContrato(${c.id})">🗑</button></td></tr>`;
+  }).join('');
+  return`
+  <div class="filters">
+    <input class="search-box" placeholder="🔍 Buscar contrato…" value="${window._searchCt||''}" oninput="window._searchCt=this.value;renderPage()">
+    <select class="filter-select" onchange="window._filterCtEst=this.value;renderPage()">
+      <option value="">Todos</option><option${est==='Activo'?' selected':''}>Activo</option><option${est==='Suspendido'?' selected':''}>Suspendido</option><option${est==='Finalizado'?' selected':''}>Finalizado</option>
+    </select>
+    <select class="filter-select" onchange="window._filterCtTipo=this.value;renderPage()">
+      <option value="">Tipo pago</option><option${tipo==='Mensual'?' selected':''}>Mensual</option><option${tipo==='Semanal'?' selected':''}>Semanal</option>
+    </select>
+    <button class="btn btn-primary btn-sm" onclick="openFormContrato()">+ Nuevo contrato</button>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">Contratos de renta</div>${badge(data.length,'bg')}</div>
+    <div class="table-wrap"><table><thead><tr><th>#</th><th>Cliente</th><th>Lavadora</th><th>Renta</th><th>Tipo</th><th>Estado</th><th></th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="7"><div class="empty"><div class="empty-icon">📋</div><p>Sin contratos</p></div></td></tr>'}</tbody></table></div>
+  </div>`;
+}
+function openFormContrato(c){
+  document.getElementById('ctId').value      = c?c.id:'';
+  document.getElementById('ctCliente').innerHTML   = db.clientes.map(x=>`<option value="${x.id}"${c&&c.clienteId===x.id?' selected':''}>${x.nombre}</option>`).join('');
+  document.getElementById('ctLavadora').innerHTML  = db.lavadoras.map(x=>`<option value="${x.id}"${c&&c.lavadoraId===x.id?' selected':''}>${x.num} · ${x.marca} (${x.estado})</option>`).join('');
+  document.getElementById('ctInicio').value  = c?c.inicio:today();
+  document.getElementById('ctTipo').value    = c?c.tipo:'Mensual';
+  document.getElementById('ctMonto').value   = c?c.monto:'';
+  document.getElementById('ctEstado').value  = c?c.estado:'Activo';
+  document.getElementById('ctDir').value     = c?c.dir:'';
+  document.getElementById('ctNotas').value   = c?c.notas:'';
+  document.getElementById('mContTitle').textContent = c?'Editar contrato':'Nuevo contrato';
+  openModal('modal-contrato');
+}
+function editContrato(id){ openFormContrato(db.contratos.find(c=>c.id===id)); }
+async function guardarContrato(){
+  const id    = document.getElementById('ctId').value;
+  const cliId = Number(document.getElementById('ctCliente').value);
+  const lavId = Number(document.getElementById('ctLavadora').value);
+  const monto = document.getElementById('ctMonto').value;
+  if(!cliId||!lavId||!monto){ toast('Completa los campos obligatorios','e'); return; }
+  const data  = {clienteId:cliId,lavadoraId:lavId,monto:Number(monto),inicio:document.getElementById('ctInicio').value,tipo:document.getElementById('ctTipo').value,estado:document.getElementById('ctEstado').value,dir:document.getElementById('ctDir').value,notas:document.getElementById('ctNotas').value};
+  if(id){ db.contratos=db.contratos.map(c=>c.id==id?{...c,...data}:c); toast('Contrato actualizado'); }
+  else  {
+    db.contratos.push({id:nextId(db.contratos),...data});
+    if(data.estado==='Activo') db.lavadoras=db.lavadoras.map(l=>l.id===lavId?{...l,estado:'Rentada'}:l);
+    toast('Contrato registrado');
+  }
+  closeModal('modal-contrato'); await persist(); renderPage();
+}
+async function delContrato(id){
+  if(!confirm('¿Eliminar este contrato?')) return;
+  db.contratos=db.contratos.filter(c=>c.id!==id);
+  await persist(); renderPage(); toast('Contrato eliminado','i');
+}
+function verContrato(id){
+  const c=db.contratos.find(x=>x.id===id); if(!c) return;
+  const cli=db.clientes.find(x=>x.id===c.clienteId), lav=db.lavadoras.find(x=>x.id===c.lavadoraId);
+  const ps=db.pagos.filter(p=>p.contratoId===id), total=ps.reduce((s,p)=>s+p.monto,0);
+  document.getElementById('mDetTitle').textContent=`Contrato #${c.id}`;
+  document.getElementById('mDetBody').innerHTML=`
+    <div class="summary-grid">
+      <div><div class="sum-val" style="color:var(--accent)">${ps.length}</div><div class="sum-label">Pagos</div></div>
+      <div><div class="sum-val" style="color:var(--accent2);font-size:16px">${fmtMXN(total)}</div><div class="sum-label">Recaudado</div></div>
+      <div><div class="sum-val" style="color:var(--warn);font-size:13px">${proximaFecha(c)}</div><div class="sum-label">Próximo pago</div></div>
+    </div>
+    ${[['Cliente',cli?.nombre||'—'],['Lavadora',lav?lav.num+' · '+lav.marca:'—'],['Inicio',c.inicio],['Tipo',c.tipo],['Renta',fmtMXN(c.monto)],['Estado',c.estado]].map(([k,v])=>`<div class="detail-row"><span class="dk">${k}</span><span class="dv">${v}</span></div>`).join('')}`;
+  document.getElementById('mDetFoot').innerHTML=`<button class="btn btn-secondary" onclick="closeModal('modal-detalle')">Cerrar</button><button class="btn btn-primary" onclick="closeModal('modal-detalle');editContrato(${id})">Editar</button>`;
+  openModal('modal-detalle');
+}
+
+// ══════════════════════════════════════════════
+//  LAVADORAS
+// ══════════════════════════════════════════════
+function renderLavadoras(){
+  const q=(window._searchLav||'').toLowerCase(), est=window._filterLavEst||'';
+  const data=db.lavadoras.filter(l=>(!q||l.num.toLowerCase().includes(q)||l.marca.toLowerCase().includes(q))&&(!est||l.estado===est));
+  const rows=data.map(l=>{
+    const cont=db.contratos.find(c=>c.lavadoraId===l.id&&c.estado==='Activo');
+    const cli=cont?db.clientes.find(c=>c.id===cont.clienteId):null;
+    return`<tr><td style="font-weight:700;color:var(--accent)">${l.num}</td>
+      <td>${l.marca} ${l.modelo}</td><td>${l.cap?l.cap+' kg':'—'}</td>
+      <td>${stBadge(l.estado)}</td><td style="color:var(--muted)">${cli?cli.nombre:'—'}</td>
+      <td><button class="action-btn" onclick="verLavadora(${l.id})">👁</button>
+          <button class="action-btn" onclick="editLavadora(${l.id})">✏️</button>
+          <button class="action-btn" onclick="delLavadora(${l.id})">🗑</button></td></tr>`;
+  }).join('');
+  return`
+  <div class="filters">
+    <input class="search-box" placeholder="🔍 Buscar lavadora…" value="${window._searchLav||''}" oninput="window._searchLav=this.value;renderPage()">
+    <select class="filter-select" onchange="window._filterLavEst=this.value;renderPage()">
+      <option value="">Todos</option><option${est==='Disponible'?' selected':''}>Disponible</option><option${est==='Rentada'?' selected':''}>Rentada</option><option${est==='Mantenimiento'?' selected':''}>Mantenimiento</option>
+    </select>
+    <button class="btn btn-primary btn-sm" onclick="openFormLavadora()">+ Nueva lavadora</button>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">Inventario de lavadoras</div>${badge(data.length,'bg')}</div>
+    <div class="table-wrap"><table><thead><tr><th>ID</th><th>Marca / Modelo</th><th>Capacidad</th><th>Estado</th><th>Cliente</th><th></th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="6"><div class="empty"><div class="empty-icon">🌀</div><p>Sin lavadoras</p></div></td></tr>'}</tbody></table></div>
+  </div>`;
+}
+function openFormLavadora(l){
+  document.getElementById('lId').value    = l?l.id:'';
+  document.getElementById('lNum').value   = l?l.num:'';
+  document.getElementById('lMarca').value = l?l.marca:'';
+  document.getElementById('lModelo').value= l?l.modelo:'';
+  document.getElementById('lCap').value   = l?l.cap:'';
+  document.getElementById('lEstado').value= l?l.estado:'Disponible';
+  document.getElementById('lAnio').value  = l?l.anio:'';
+  document.getElementById('lNotas').value = l?l.notas:'';
+  document.getElementById('mLavTitle').textContent = l?'Editar lavadora':'Nueva lavadora';
+  openModal('modal-lavadora');
+}
+function editLavadora(id){ openFormLavadora(db.lavadoras.find(l=>l.id===id)); }
+async function guardarLavadora(){
+  const id=document.getElementById('lId').value;
+  const num=document.getElementById('lNum').value.trim(), marca=document.getElementById('lMarca').value.trim();
+  if(!num||!marca){ toast('ID y marca obligatorios','e'); return; }
+  const data={num,marca,modelo:document.getElementById('lModelo').value,cap:Number(document.getElementById('lCap').value),estado:document.getElementById('lEstado').value,anio:document.getElementById('lAnio').value,notas:document.getElementById('lNotas').value};
+  if(id){ db.lavadoras=db.lavadoras.map(l=>l.id==id?{...l,...data}:l); toast('Lavadora actualizada'); }
+  else  { db.lavadoras.push({id:nextId(db.lavadoras),...data}); toast('Lavadora registrada'); }
+  closeModal('modal-lavadora'); await persist(); renderPage();
+}
+async function delLavadora(id){
+  if(!confirm('¿Eliminar esta lavadora?')) return;
+  db.lavadoras=db.lavadoras.filter(l=>l.id!==id);
+  await persist(); renderPage(); toast('Lavadora eliminada','i');
+}
+function verLavadora(id){
+  const l=db.lavadoras.find(x=>x.id===id); if(!l) return;
+  const cont=db.contratos.find(c=>c.lavadoraId===id&&c.estado==='Activo');
+  const cli=cont?db.clientes.find(c=>c.id===cont.clienteId):null;
+  document.getElementById('mDetTitle').textContent=l.num+' · '+l.marca;
+  document.getElementById('mDetBody').innerHTML=[['Modelo',l.modelo||'—'],['Capacidad',l.cap?l.cap+' kg':'—'],['Año',l.anio||'—'],['Estado',l.estado],['Cliente actual',cli?cli.nombre:'Sin contrato activo'],['Notas',l.notas||'—']].map(([k,v])=>`<div class="detail-row"><span class="dk">${k}</span><span class="dv">${v}</span></div>`).join('');
+  document.getElementById('mDetFoot').innerHTML=`<button class="btn btn-secondary" onclick="closeModal('modal-detalle')">Cerrar</button><button class="btn btn-primary" onclick="closeModal('modal-detalle');editLavadora(${id})">Editar</button>`;
+  openModal('modal-detalle');
+}
+
+// ══════════════════════════════════════════════
+//  PAGOS
+// ══════════════════════════════════════════════
+let activePagoTab = 'registrar';
+
+function renderPagos(){
+  const pendientes = calcPendientes();
+  const q=(window._searchPago||'').toLowerCase(), met=window._filterPagoMet||'';
+  const hist=db.pagos.filter(p=>{
+    const c=db.contratos.find(x=>x.id===p.contratoId);
+    const cli=c?db.clientes.find(x=>x.id===c.clienteId):null;
+    return(!q||cli?.nombre.toLowerCase().includes(q)||p.periodo.toLowerCase().includes(q))&&(!met||p.metodo===met);
+  });
+  const activos  = db.contratos.filter(c=>c.estado==='Activo');
+  const contOpts = activos.map(c=>{
+    const cli=db.clientes.find(x=>x.id===c.clienteId);
+    const lav=db.lavadoras.find(x=>x.id===c.lavadoraId);
+    return`<option value="${c.id}">#${c.id} · ${cli?cli.nombre:'—'} · ${lav?lav.num:'—'} (${c.tipo} ${fmtMXN(c.monto)})</option>`;
+  }).join('');
+  const tabs=`<div class="tab-bar">
+    <button class="tab-btn${activePagoTab==='registrar'?' active':''}" onclick="activePagoTab='registrar';renderPage()">Registrar pago</button>
+    <button class="tab-btn${activePagoTab==='historial'?' active':''}" onclick="activePagoTab='historial';renderPage()">Historial</button>
+    <button class="tab-btn${activePagoTab==='pendientes'?' active':''}" onclick="activePagoTab='pendientes';renderPage()">Pendientes${pendientes.length?` (${pendientes.length})`:''}</button>
+  </div>`;
+
+  if(activePagoTab==='registrar') return tabs+`
+    <div class="card" style="max-width:520px">
+      <div class="card-header"><div class="card-title">Registrar nuevo pago</div></div>
+      <div style="padding:20px;display:flex;flex-direction:column;gap:14px">
+        <div class="form-group"><label class="form-label">Contrato *</label>
+          <select class="form-select" id="pContrato" onchange="updatePagoInfo()"><option value="">— Seleccionar —</option>${contOpts}</select>
+        </div>
+        <div class="info-box" id="pInfoBox" style="display:none"></div>
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">Monto *</label><input class="form-input" type="number" id="pMonto" placeholder="$0.00"></div>
+          <div class="form-group"><label class="form-label">Fecha *</label><input class="form-input" type="date" id="pFecha" value="${today()}"></div>
+          <div class="form-group"><label class="form-label">Método</label><select class="form-select" id="pMetodo"><option>Efectivo</option><option>Transferencia</option><option>Tarjeta</option></select></div>
+          <div class="form-group"><label class="form-label">Período</label><input class="form-input" id="pPeriodo" placeholder="Ej: Julio 2025"></div>
+        </div>
+        <div class="form-group"><label class="form-label">Notas</label><textarea class="form-textarea" id="pNotas" rows="2"></textarea></div>
+        <div style="display:flex;gap:10px">
+          <button class="btn btn-success" onclick="registrarPago()">✓ Registrar pago</button>
+          <button class="btn btn-secondary" onclick="limpiarPago()">Limpiar</button>
+        </div>
+      </div>
+    </div>`;
+
+  if(activePagoTab==='historial'){
+    const rows=[...hist].reverse().map(p=>{
+      const c=db.contratos.find(x=>x.id===p.contratoId);
+      const cli=c?db.clientes.find(x=>x.id===c.clienteId):null;
+      return`<tr><td>${p.fecha}</td><td>${cli?cli.nombre:'—'}</td><td style="color:var(--muted)">${p.periodo}</td><td style="color:var(--accent2);font-weight:600">${fmtMXN(p.monto)}</td><td>${badge(p.metodo,'gx')}</td><td><button class="action-btn" onclick="delPago(${p.id})">🗑</button></td></tr>`;
+    }).join('');
+    return tabs+`
+    <div class="filters">
+      <input class="search-box" placeholder="🔍 Buscar…" value="${window._searchPago||''}" oninput="window._searchPago=this.value;renderPage()">
+      <select class="filter-select" onchange="window._filterPagoMet=this.value;renderPage()">
+        <option value="">Todos los métodos</option><option${met==='Efectivo'?' selected':''}>Efectivo</option><option${met==='Transferencia'?' selected':''}>Transferencia</option><option${met==='Tarjeta'?' selected':''}>Tarjeta</option>
+      </select>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">Historial de pagos</div>${badge(hist.length,'bg')}</div>
+      <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Cliente</th><th>Período</th><th>Monto</th><th>Método</th><th></th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="6"><div class="empty"><div class="empty-icon">💰</div><p>Sin pagos</p></div></td></tr>'}</tbody></table></div>
+    </div>`;
+  }
+
+  if(activePagoTab==='pendientes'){
+    const rows=pendientes.map(c=>{
+      const cli=db.clientes.find(x=>x.id===c.clienteId);
+      return`<tr><td style="font-weight:600">${cli?cli.nombre:'—'}</td>
+        <td style="color:var(--accent2);font-weight:600">${fmtMXN(c.monto)}</td>
+        <td>${badge(c.tipo,'bg')}</td><td>${c.prox}</td>
+        <td>${badge(c.status,c.status==='Vencido'?'gr':'gy')}</td>
+        <td><button class="btn btn-success btn-sm" onclick="activePagoTab='registrar';window._pagoPresetId=${c.id};renderPage()">Pagar</button></td></tr>`;
+    }).join('');
+    return tabs+`
+    <div class="card">
+      <div class="card-header"><div class="card-title">Pagos pendientes / vencidos</div></div>
+      <div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Renta</th><th>Tipo</th><th>Próximo</th><th>Estado</th><th></th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="6"><div class="empty"><div class="empty-icon">✅</div><p>Sin pagos pendientes</p></div></td></tr>'}</tbody></table></div>
+    </div>`;
+  }
+}
+
+function updatePagoInfo(){
+  const id=Number(qs('#pContrato')?.value);
+  const box=qs('#pInfoBox'); if(!box) return;
+  if(!id){ box.style.display='none'; return; }
+  const c=db.contratos.find(x=>x.id===id); if(!c){ box.style.display='none'; return; }
+  const cli=db.clientes.find(x=>x.id===c.clienteId);
+  if(qs('#pMonto')) qs('#pMonto').value=c.monto;
+  box.innerHTML=`<b>${cli?cli.nombre:'—'}</b> · ${c.tipo} · <b style="color:var(--accent2)">${fmtMXN(c.monto)}</b> · Próximo: <b>${proximaFecha(c)}</b>`;
+  box.style.display='block';
+}
+async function registrarPago(){
+  const id=Number(qs('#pContrato')?.value);
+  const monto=qs('#pMonto')?.value, fecha=qs('#pFecha')?.value;
+  if(!id||!monto||!fecha){ toast('Completa los campos obligatorios','e'); return; }
+  db.pagos.push({id:nextId(db.pagos),contratoId:id,monto:Number(monto),fecha,metodo:qs('#pMetodo').value,periodo:qs('#pPeriodo').value,notas:qs('#pNotas').value});
+  await persist(); toast('Pago registrado ✓'); limpiarPago(); renderPage();
+}
+function limpiarPago(){ window._pagoPresetId=null; renderPage(); }
+async function delPago(id){
+  if(!confirm('¿Eliminar pago?')) return;
+  db.pagos=db.pagos.filter(p=>p.id!==id);
+  await persist(); renderPage(); toast('Pago eliminado','i');
+}
+
+// ══════════════════════════════════════════════
+//  REPORTES
+// ══════════════════════════════════════════════
+function renderReportes(){
+  const total   = db.pagos.reduce((s,p)=>s+p.monto,0);
+  const activos = db.contratos.filter(c=>c.estado==='Activo');
+  const rentadas= db.lavadoras.filter(l=>l.estado==='Rentada').length;
+  const totalLav= db.lavadoras.length;
+  const prom    = activos.length?activos.reduce((s,c)=>s+c.monto,0)/activos.length:0;
+  const venc    = calcPendientes().filter(v=>v.status==='Vencido').length;
+  const mora    = activos.length?Math.round(venc/activos.length*100):0;
+  const now     = new Date();
+  const months  = Array.from({length:6},(_,i)=>{
+    const d=new Date(now); d.setMonth(d.getMonth()-(5-i));
+    const t=db.pagos.filter(p=>{const pd=new Date(p.fecha);return pd.getMonth()===d.getMonth()&&pd.getFullYear()===d.getFullYear();}).reduce((s,p)=>s+p.monto,0);
+    return{label:d.toLocaleDateString('es-MX',{month:'short'}),val:t,display:fmtMXN(t)};
+  });
+  const maxM  = Math.max(...months.map(x=>x.val),1);
+  const lavEst= [['Rentadas','Rentada','var(--accent)'],['Disponibles','Disponible','var(--accent2)'],['Mantenimiento','Mantenimiento','var(--warn)']];
+  const maxE  = Math.max(...lavEst.map(([,k])=>db.lavadoras.filter(l=>l.estado===k).length),1);
+  return`
+  <div class="stat-grid">
+    <div class="stat-card"><div class="stat-label">Ingresos totales</div><div class="stat-value" style="font-size:22px">${fmtMXN(total)}</div><div class="stat-sub">acumulado</div><div class="stat-icon">📈</div></div>
+    <div class="stat-card green"><div class="stat-label">Ocupación</div><div class="stat-value">${totalLav?Math.round(rentadas/totalLav*100):0}%</div><div class="stat-sub">lavadoras activas</div><div class="stat-icon">🌀</div></div>
+    <div class="stat-card yellow"><div class="stat-label">Promedio/contrato</div><div class="stat-value" style="font-size:22px">${fmtMXN(Math.round(prom))}</div><div class="stat-sub">renta mensual</div><div class="stat-icon">💵</div></div>
+    <div class="stat-card red"><div class="stat-label">Morosidad</div><div class="stat-value">${mora}%</div><div class="stat-sub">contratos vencidos</div><div class="stat-icon">⚠️</div></div>
+  </div>
+  <div class="two-col">
+    <div class="card">
+      <div class="card-header"><div class="card-title">Ingresos por mes</div></div>
+      <div style="padding:18px">${months.map(m=>`<div class="bar-row"><div class="bar-label">${m.label}</div><div class="bar-track"><div class="bar-fill" style="width:${m.val/maxM*100}%;background:var(--accent)"></div></div><div class="bar-val">${m.display}</div></div>`).join('')}</div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">Estado del inventario</div></div>
+      <div style="padding:18px">${lavEst.map(([label,key,color])=>{const v=db.lavadoras.filter(l=>l.estado===key).length;return`<div class="bar-row"><div class="bar-label">${label}</div><div class="bar-track"><div class="bar-fill" style="width:${v/maxE*100}%;background:${color}"></div></div><div class="bar-val">${v} unidades</div></div>`;}).join('')}</div>
+    </div>
+  </div>`;
+}
+
+// ══════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════
+async function init(){
+  document.getElementById('topDate').textContent =
+    new Date().toLocaleDateString('es-MX',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+
+  try {
+    const data = await cloudLoad();
+    if (data && (data.clientes?.length || data.lavadoras?.length || data.contratos?.length || data.pagos?.length)) {
+      db = data;
+      lsSave();
+      usingCloud = true;
+      toast('Datos cargados desde Supabase ☁️');
+    } else {
+      // Bin vacío — subir seed
+      seed();
+      usingCloud = true;
+      await cloudSave();
+      lsSave();
+      toast('Base de datos inicializada ☁️');
+    }
+  } catch(e) {
+    console.warn('Supabase no disponible:', e.message);
+    if (!lsLoad()) { seed(); lsSave(); }
+    usingCloud = false;
+    toast('Modo offline — datos locales','i');
+  }
+
+  updateStatus();
+  buildNav();
+  renderPage();
+
+  // Sidebar responsivo
+  function applySidebar(){
+    const wide = window.innerWidth >= 700;
+    document.getElementById('sidebar').classList.toggle('closed', !wide);
+    document.getElementById('mainWrap').style.marginLeft = wide ? '220px' : '0';
+  }
+  applySidebar();
+  window.addEventListener('resize', applySidebar);
+}
+
+init();
+</script>
+</body>
+</html>
