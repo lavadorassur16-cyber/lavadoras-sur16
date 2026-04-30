@@ -1063,6 +1063,27 @@ async function init(){
   document.getElementById('topDate').textContent =
     new Date().toLocaleDateString('es-MX',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
 
+  // Tecla Enter en login
+  ['loginEmail','loginPassword'].forEach(id=>{
+    document.getElementById(id).addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
+  });
+
+  const savedToken  = localStorage.getItem(LS_TOKEN);
+  const savedRToken = localStorage.getItem(LS_RTOKEN);
+
+  if(savedToken&&savedRToken){
+    try {
+      const s = await refreshSession(savedRToken);
+      accessToken=s.access_token; currentUser=s.user;
+      localStorage.setItem(LS_TOKEN,  s.access_token);
+      localStorage.setItem(LS_RTOKEN, s.refresh_token);
+      setUserUI(currentUser);
+      await loadAndBoot();
+      return;
+    } catch(e){
+      localStorage.removeItem(LS_TOKEN); localStorage.removeItem(LS_RTOKEN);
+    }
+
   try {
     const data = await cloudLoad();
     if (data && (data.clientes?.length || data.lavadoras?.length || data.contratos?.length || data.pagos?.length)) {
