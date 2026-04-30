@@ -1084,8 +1084,6 @@ async function init(){
       localStorage.removeItem(LS_TOKEN); localStorage.removeItem(LS_RTOKEN);
         }
     }
-  
-    
   try {
     const data = await cloudLoad();
     if (data && (data.clientes?.length || data.lavadoras?.length || data.contratos?.length || data.pagos?.length)) {
