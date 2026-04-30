@@ -1082,11 +1082,10 @@ async function init(){
       return;
     } catch(e){
       localStorage.removeItem(LS_TOKEN); localStorage.removeItem(LS_RTOKEN);
-    }
-      }
-  document.getElementById('loginScreen').classList.add('show');
-}
+        }
 
+}
+document.getElementById('loginScreen').classList.add('show');      
   try {
     const data = await cloudLoad();
     if (data && (data.clientes?.length || data.lavadoras?.length || data.contratos?.length || data.pagos?.length)) {
