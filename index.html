@@ -1063,28 +1063,40 @@ async function init(){
   document.getElementById('topDate').textContent =
     new Date().toLocaleDateString('es-MX',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
 
-  // Tecla Enter en login
-  ['loginEmail','loginPassword'].forEach(id=>{
-    document.getElementById(id).addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
-  });
-
-  const savedToken  = localStorage.getItem(LS_TOKEN);
-  const savedRToken = localStorage.getItem(LS_RTOKEN);
-
-  if(savedToken&&savedRToken){
-    try {
-      const s = await refreshSession(savedRToken);
-      accessToken=s.access_token; currentUser=s.user;
-      localStorage.setItem(LS_TOKEN,  s.access_token);
-      localStorage.setItem(LS_RTOKEN, s.refresh_token);
-      setUserUI(currentUser);
-      await loadAndBoot();
-      return;
-    } catch(e){
-      localStorage.removeItem(LS_TOKEN); localStorage.removeItem(LS_RTOKEN);
+  try {
+    const data = await cloudLoad();
+    if (data && (data.clientes?.length || data.lavadoras?.length || data.contratos?.length || data.pagos?.length)) {
+      db = data;
+      lsSave();
+      usingCloud = true;
+      toast('Datos cargados desde Supabase ☁️');
+    } else {
+      // Bin vacío — subir seed
+      seed();
+      usingCloud = true;
+      await cloudSave();
+      lsSave();
+      toast('Base de datos inicializada ☁️');
     }
+  } catch(e) {
+    console.warn('Supabase no disponible:', e.message);
+    if (!lsLoad()) { seed(); lsSave(); }
+    usingCloud = false;
+    toast('Modo offline — datos locales','i');
   }
-  document.getElementById('loginScreen').classList.add('show');
+
+  updateStatus();
+  buildNav();
+  renderPage();
+
+  // Sidebar responsivo
+  function applySidebar(){
+    const wide = window.innerWidth >= 700;
+    document.getElementById('sidebar').classList.toggle('closed', !wide);
+    document.getElementById('mainWrap').style.marginLeft = wide ? '220px' : '0';
+  }
+  applySidebar();
+  window.addEventListener('resize', applySidebar);
 }
 
 init();
