@@ -200,7 +200,6 @@ tr:hover td{background:#F7F9FF}
       <div class="login-spinner" id="loginSpinner">🌀 Verificando…</div>
     </div>
     <div class="login-footer">Sistema privado — solo usuarios autorizados</div>
-    <div class="login-footer">Desarrollado por Solutecnosin®</div>
   </div>
 </div>
 
@@ -637,7 +636,7 @@ function renderDashboard(){
     const cli=db.clientes.find(x=>x.id===c.clienteId), prox=proximaFecha(c);
     const diff=Math.ceil((new Date(prox)-now)/86400000);
     const bc=diff<0?'gr':diff<=3?'gy':'gg', bl=diff<0?'Vencido':diff===0?'Hoy':`En ${diff}d`;
-    return`<tr><td style="color:var(--muted)">#${c.clienteId}</td><td style="font-weight:600">${cli?cli.nombre:'—'}</td><td style="color:var(--accent2);font-weight:600">${fmtMXN(c.monto)}</td><td>${prox}</td><td>${badge(bl,bc)}</td></tr>`;
+    return`<tr><td style="font-weight:600">${cli?cli.nombre:'—'}</td><td style="color:var(--accent2);font-weight:600">${fmtMXN(c.monto)}</td><td>${prox}</td><td>${badge(bl,bc)}</td></tr>`;
   }).join('');
   const ultPagos=[...db.pagos].reverse().slice(0,5).map(p=>{
     const c=db.contratos.find(x=>x.id===p.contratoId), cli=c?db.clientes.find(x=>x.id===c.clienteId):null;
@@ -653,7 +652,7 @@ function renderDashboard(){
   <div class="two-col">
     <div class="card">
       <div class="card-header"><div class="card-title">Próximos cobros</div>${badge('7 días','bg')}</div>
-      <div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Monto</th><th>Vence</th><th>Estado</th></tr></thead><tbody>${proxRows||'<tr><td colspan="4"><div class="empty">Sin contratos</div></td></tr>'}</tbody></table></div>
+      <div class="table-wrap"><table><thead><tr><th>ID Cli.</th><th>Cliente</th><th>Monto</th><th>Próximo cobro</th><th>Estado</th><th></th></tr></thead><tbody>${proxRows||'<tr><td colspan="6"><div class="empty">Sin contratos</div></td></tr>'}</tbody></table></div>
     </div>
     <div class="card">
       <div class="card-header"><div class="card-title">Disponibilidad</div>${badge(disp+' disponibles','gg')}</div>
@@ -663,6 +662,34 @@ function renderDashboard(){
         <div class="bar-row"><div class="bar-label">Mantenimiento</div><div class="bar-track"><div class="bar-fill" style="width:${mant/maxLav*100}%;background:var(--warn)"></div></div><div class="bar-val">${mant}/${totalLav}</div></div>
       </div>
     </div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">Todos los contratos activos</div>${badge(activos.length,'gg')}</div>
+    <div class="table-wrap"><table><thead><tr>
+      <th># Cont.</th><th>ID Cli.</th><th>Cliente</th><th>Lavadora</th><th>Renta</th><th>Tipo</th><th>Inicio</th><th>Próx. pago</th><th>Estatus</th><th></th>
+    </tr></thead><tbody>${activos.length?activos.map(c=>{
+      const cli=db.clientes.find(x=>x.id===c.clienteId);
+      const lav=db.lavadoras.find(x=>x.id===c.lavadoraId);
+      const prox=proximaFecha(c);
+      const diff=Math.ceil((new Date(prox)-now)/86400000);
+      const bc=diff<0?'gr':diff<=3?'gy':'gg', bl=diff<0?'Vencido':diff===0?'Hoy':`En ${diff}d`;
+      return`<tr>
+        <td style="color:var(--muted);font-weight:700">#${c.id}</td>
+        <td style="color:var(--muted)">#${c.clienteId}</td>
+        <td style="font-weight:600">${cli?cli.nombre:'—'}</td>
+        <td>${lav?lav.num:'—'}</td>
+        <td style="color:var(--accent2);font-weight:600">${fmtMXN(c.monto)}</td>
+        <td>${badge(c.tipo,'bg')}</td>
+        <td>${c.inicio}</td>
+        <td>${prox} ${badge(bl,bc)}</td>
+        <td>${badge(c.estado,c.estado==='Activo'?'gg':c.estado==='Suspendido'?'gy':'gx')}</td>
+        <td>
+          <button class="action-btn" title="Finalizar" onclick="finalizarContrato(${c.id})">🔴</button>
+          <button class="action-btn" title="Renovar" onclick="renovarContrato(${c.id})">🔄</button>
+          <button class="action-btn" title="Ver detalle" onclick="goPage('contratos');setTimeout(()=>verContrato(${c.id}),100)">👁</button>
+        </td>
+      </tr>`;
+    }).join(''):'<tr><td colspan="10"><div class="empty">Sin contratos activos</div></td></tr>'}</tbody></table></div>
   </div>
   <div class="card">
     <div class="card-header"><div class="card-title">Últimos pagos</div></div>
@@ -701,7 +728,7 @@ function renderClientes(){
   <div class="card">
     <div class="card-header"><div class="card-title">Clientes registrados</div>${badge(data.length,'bg')}</div>
     <div class="table-wrap"><table><thead><tr><th>ID</th><th>Nombre</th><th>Teléfono</th><th>Dirección</th><th>Contratos</th><th>Estado</th><th></th></tr></thead>
-    <tbody>${rows||'<tr><td colspan="8"><div class="empty"><div class="empty-icon">👤</div><p>Sin clientes</p></div></td></tr>'}</tbody></table></div>
+    <tbody>${rows||'<tr><td colspan="7"><div class="empty"><div class="empty-icon">👤</div><p>Sin clientes</p></div></td></tr>'}</tbody></table></div>
   </div>`;
 }
 function openFormCliente(c){
@@ -756,6 +783,7 @@ function renderContratos(){
     const bc=c.estado==='Activo'?'gg':c.estado==='Suspendido'?'gy':'gx';
     return`<tr>
       <td style="color:var(--muted);font-weight:700">#${c.id}</td>
+      <td style="color:var(--muted)">#${c.clienteId}</td>
       <td style="font-weight:600">${cli?cli.nombre:'—'}</td>
       <td>${lav?lav.num+' · '+lav.marca:'—'}</td>
       <td style="color:var(--accent2);font-weight:600">${fmtMXN(c.monto)}</td>
@@ -780,7 +808,7 @@ function renderContratos(){
   </div>
   <div class="card">
     <div class="card-header"><div class="card-title">Contratos de renta</div>${badge(data.length,'bg')}</div>
-    <div class="table-wrap"><table><thead><tr><th>#</th><th>ID Cliente</th><th>Cliente</th><th>Lavadora</th><th>Renta</th><th>Tipo</th><th>Estado</th><th></th></tr></thead>
+    <div class="table-wrap"><table><thead><tr><th>#</th><th>Cliente</th><th>Lavadora</th><th>Renta</th><th>Tipo</th><th>Estado</th><th></th></tr></thead>
     <tbody>${rows||'<tr><td colspan="7"><div class="empty"><div class="empty-icon">📋</div><p>Sin contratos</p></div></td></tr>'}</tbody></table></div>
   </div>`;
 }
@@ -1082,42 +1110,9 @@ async function init(){
       return;
     } catch(e){
       localStorage.removeItem(LS_TOKEN); localStorage.removeItem(LS_RTOKEN);
-        }
     }
-  try {
-    const data = await cloudLoad();
-    if (data && (data.clientes?.length || data.lavadoras?.length || data.contratos?.length || data.pagos?.length)) {
-      db = data;
-      lsSave();
-      usingCloud = true;
-      toast('Datos cargados desde Supabase ☁️');
-    } else {
-      // Bin vacío — subir seed
-      seed();
-      usingCloud = true;
-      await cloudSave();
-      lsSave();
-      toast('Base de datos inicializada ☁️');
-    }
-  } catch(e) {
-    console.warn('Supabase no disponible:', e.message);
-    if (!lsLoad()) { seed(); lsSave(); }
-    usingCloud = false;
-    toast('Modo offline — datos locales','i');
   }
-
-  updateStatus();
-  buildNav();
-  renderPage();
-
-  // Sidebar responsivo
-  function applySidebar(){
-    const wide = window.innerWidth >= 700;
-    document.getElementById('sidebar').classList.toggle('closed', !wide);
-    document.getElementById('mainWrap').style.marginLeft = wide ? '220px' : '0';
-  }
-  applySidebar();
-  window.addEventListener('resize', applySidebar);
+  document.getElementById('loginScreen').classList.add('show');
 }
 
 init();
