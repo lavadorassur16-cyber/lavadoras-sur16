@@ -637,7 +637,7 @@ function renderDashboard(){
     const cli=db.clientes.find(x=>x.id===c.clienteId), prox=proximaFecha(c);
     const diff=Math.ceil((new Date(prox)-now)/86400000);
     const bc=diff<0?'gr':diff<=3?'gy':'gg', bl=diff<0?'Vencido':diff===0?'Hoy':`En ${diff}d`;
-    return`<tr><td style="font-weight:600">${cli?cli.nombre:'—'}</td><td style="color:var(--accent2);font-weight:600">${fmtMXN(c.monto)}</td><td>${prox}</td><td>${badge(bl,bc)}</td></tr>`;
+    return`<tr><td style="color:var(--muted)">#${c.clienteId}</td><td style="font-weight:600">${cli?cli.nombre:'—'}</td><td style="color:var(--accent2);font-weight:600">${fmtMXN(c.monto)}</td><td>${prox}</td><td>${badge(bl,bc)}</td></tr>`;
   }).join('');
   const ultPagos=[...db.pagos].reverse().slice(0,5).map(p=>{
     const c=db.contratos.find(x=>x.id===p.contratoId), cli=c?db.clientes.find(x=>x.id===c.clienteId):null;
