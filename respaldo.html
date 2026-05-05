@@ -47,6 +47,12 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 .user-menu-divider{height:1px;background:var(--border)}
 .pwd-info{background:var(--surface2);border-radius:9px;padding:10px 14px;font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.6}
 
+/* ── INACTIVITY WARNING ── */
+.inactivity-banner{display:none;position:fixed;bottom:0;left:0;right:0;background:#1a1f36;color:#fff;z-index:500;padding:12px 20px;align-items:center;justify-content:space-between;gap:14px;font-size:13px;box-shadow:0 -4px 20px rgba(0,0,0,.25)}
+.inactivity-banner.show{display:flex}
+.inactivity-countdown{font-weight:800;color:var(--warn);font-size:15px;min-width:28px;text-align:center}
+.inactivity-btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
+
 /* ── TOPBAR ── */
 .topbar{height:56px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;padding:0 16px;position:sticky;top:0;z-index:100;box-shadow:var(--shadow)}
 .menu-btn{background:none;border:none;cursor:pointer;font-size:20px;padding:4px 8px;color:var(--muted);border-radius:7px}
@@ -106,6 +112,8 @@ tr:hover td{background:#F7F9FF}
 .btn-success{background:var(--accent2);color:#fff}.btn-success:hover{background:#0ea471}
 .btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border)}.btn-secondary:hover{background:var(--border)}
 .btn-ghost{background:transparent;color:var(--danger);border:1px solid #FECACA;font-size:11px;padding:6px 12px}
+.btn-warn{background:var(--warn);color:#fff}.btn-warn:hover{background:#d97706}
+.btn-danger{background:var(--danger);color:#fff}.btn-danger:hover{background:#dc2626}
 .btn-sm{padding:6px 12px;font-size:12px}
 
 /* ── FILTERS ── */
@@ -162,7 +170,7 @@ tr:hover td{background:#F7F9FF}
 /* ── MISC ── */
 .empty{text-align:center;padding:36px 20px;color:var(--muted)}
 .empty-icon{font-size:36px;margin-bottom:8px}
-.loading{display:flex;align-items:center;justify-content:center;height:200px;flex-direction:column;gap:12px;color:var(--muted)}
+.loading{display:flex;align-items:center;justify-content:height:200px;flex-direction:column;gap:12px;color:var(--muted)}
 .spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 .info-box{background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 14px;font-size:13px;line-height:1.7;margin-bottom:4px}
@@ -177,6 +185,12 @@ tr:hover td{background:#F7F9FF}
 </style>
 </head>
 <body>
+
+<!-- ══ INACTIVITY BANNER ══ -->
+<div class="inactivity-banner" id="inactivityBanner">
+  <span>⚠️ Tu sesión se cerrará por inactividad en <span class="inactivity-countdown" id="inactivityCountdown">60</span>s</span>
+  <button class="inactivity-btn" onclick="resetInactivityTimer()">Seguir conectado</button>
+</div>
 
 <!-- ══ LOGIN ══ -->
 <div class="login-screen" id="loginScreen">
@@ -334,6 +348,21 @@ tr:hover td{background:#F7F9FF}
   </div>
 </div>
 
+<!-- ══ MODAL CONFIRMACIÓN CONTRATO ══ -->
+<div class="modal-bg" id="modal-confirma-contrato">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header">
+      <div class="modal-title" id="mConfirmaTitle">Confirmar acción</div>
+      <button class="modal-close" onclick="closeModal('modal-confirma-contrato')">×</button>
+    </div>
+    <div class="modal-body" id="mConfirmaBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-confirma-contrato')">Cancelar</button>
+      <button class="btn" id="mConfirmaBtn" onclick="">Confirmar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ══════════════════════════════════════════════
 //  CONFIG
@@ -346,12 +375,76 @@ const LS_KEY    = 'lavSur16_db';
 const LS_TOKEN  = 'lavSur16_token';
 const LS_RTOKEN = 'lavSur16_rtoken';
 
+// Inactividad: 15 min sin interacción → aviso 60s antes → cierre
+const INACTIVITY_TIMEOUT_MS  = 15 * 60 * 1000; // 15 minutos
+const INACTIVITY_WARNING_MS  = 60 * 1000;       // aviso 60 segundos antes
+
 let db          = { clientes:[], lavadoras:[], contratos:[], pagos:[] };
 let usingCloud  = false;
 let saving      = false;
 let currentPage = 'dashboard';
 let currentUser = null;
 let accessToken = null;
+
+// ══════════════════════════════════════════════
+//  INACTIVIDAD  (mejora #1)
+// ══════════════════════════════════════════════
+let _inactivityTimer   = null;
+let _warningTimer      = null;
+let _countdownInterval = null;
+
+function startInactivityWatcher() {
+  resetInactivityTimer();
+  // Cualquier interacción del usuario reinicia el temporizador
+  ['mousemove','mousedown','keydown','touchstart','scroll','click'].forEach(evt =>
+    document.addEventListener(evt, resetInactivityTimer, { passive: true })
+  );
+}
+
+function resetInactivityTimer() {
+  // Si hay aviso visible, ocultarlo
+  hideInactivityWarning();
+  clearTimeout(_inactivityTimer);
+  clearTimeout(_warningTimer);
+
+  // Timer para mostrar advertencia
+  _warningTimer = setTimeout(showInactivityWarning, INACTIVITY_TIMEOUT_MS - INACTIVITY_WARNING_MS);
+  // Timer para cerrar sesión
+  _inactivityTimer = setTimeout(() => {
+    hideInactivityWarning();
+    toast('Sesión cerrada por inactividad', 'i');
+    doLogout();
+  }, INACTIVITY_TIMEOUT_MS);
+}
+
+function stopInactivityWatcher() {
+  clearTimeout(_inactivityTimer);
+  clearTimeout(_warningTimer);
+  clearInterval(_countdownInterval);
+  hideInactivityWarning();
+  ['mousemove','mousedown','keydown','touchstart','scroll','click'].forEach(evt =>
+    document.removeEventListener(evt, resetInactivityTimer)
+  );
+}
+
+function showInactivityWarning() {
+  const banner = document.getElementById('inactivityBanner');
+  const cd     = document.getElementById('inactivityCountdown');
+  let secs = Math.round(INACTIVITY_WARNING_MS / 1000);
+  cd.textContent = secs;
+  banner.classList.add('show');
+  clearInterval(_countdownInterval);
+  _countdownInterval = setInterval(() => {
+    secs--;
+    cd.textContent = secs;
+    if (secs <= 0) clearInterval(_countdownInterval);
+  }, 1000);
+}
+
+function hideInactivityWarning() {
+  clearInterval(_countdownInterval);
+  document.getElementById('inactivityBanner').classList.remove('show');
+}
 
 // ══════════════════════════════════════════════
 //  AUTH
@@ -414,12 +507,14 @@ async function doLogin() {
     document.getElementById('loginScreen').classList.remove('show');
     setUserUI(currentUser);
     await loadAndBoot();
+    startInactivityWatcher(); // Iniciar vigilancia de inactividad al loguearse
   } catch(e) {
     errEl.textContent=e.message; errEl.style.display='block';
     btn.disabled=false; btn.style.display='block'; spinner.style.display='none';
   }
 }
 async function doLogout() {
+  stopInactivityWatcher();
   closeUserMenu(); await signOut();
   accessToken=null; currentUser=null;
   localStorage.removeItem(LS_TOKEN); localStorage.removeItem(LS_RTOKEN);
@@ -598,6 +693,95 @@ function nuevoBtn(){
 }
 
 // ══════════════════════════════════════════════
+//  ACCIONES DE CONTRATO IN-PLACE  (mejora #2)
+//  Finalizan / renuevan sin cambiar de página
+// ══════════════════════════════════════════════
+
+/**
+ * Abre modal de confirmación genérico.
+ * @param {string} title  - Título del modal
+ * @param {string} body   - HTML del cuerpo
+ * @param {string} btnLabel - Etiqueta del botón de confirmación
+ * @param {string} btnClass - Clase CSS extra del botón (btn-danger, btn-warn…)
+ * @param {Function} onConfirm - Callback al confirmar
+ */
+function confirmaAccion(title, body, btnLabel, btnClass, onConfirm) {
+  document.getElementById('mConfirmaTitle').textContent = title;
+  document.getElementById('mConfirmaBody').innerHTML = body;
+  const btn = document.getElementById('mConfirmaBtn');
+  btn.textContent = btnLabel;
+  btn.className = `btn ${btnClass}`;
+  btn.onclick = async () => {
+    closeModal('modal-confirma-contrato');
+    await onConfirm();
+  };
+  openModal('modal-confirma-contrato');
+}
+
+/**
+ * Finaliza contrato — permanece en la página actual.
+ */
+async function finalizarContrato(id) {
+  const c = db.contratos.find(x => x.id === id);
+  const cli = c ? db.clientes.find(x => x.id === c.clienteId) : null;
+  if (!c) return;
+
+  confirmaAccion(
+    '🔴 Finalizar contrato',
+    `<p style="margin-bottom:12px">¿Estás seguro de que deseas finalizar el contrato <strong>#${c.id}</strong>${cli ? ` de <strong>${cli.nombre}</strong>` : ''}?</p>
+     <p style="color:var(--muted);font-size:12px">La lavadora quedará disponible nuevamente en el inventario.</p>`,
+    'Finalizar contrato',
+    'btn-danger',
+    async () => {
+      db.contratos = db.contratos.map(x =>
+        x.id === id ? { ...x, estado: 'Finalizado' } : x
+      );
+      // Liberar lavadora
+      if (c.lavadoraId) {
+        db.lavadoras = db.lavadoras.map(l =>
+          l.id === c.lavadoraId ? { ...l, estado: 'Disponible' } : l
+        );
+      }
+      await persist();
+      renderPage(); // Se queda en la misma página
+      toast(`Contrato #${id} finalizado`);
+    }
+  );
+}
+
+/**
+ * Renueva contrato — extiende fecha de inicio a hoy y lo pone Activo.
+ * Permanece en la página actual.
+ */
+async function renovarContrato(id) {
+  const c = db.contratos.find(x => x.id === id);
+  const cli = c ? db.clientes.find(x => x.id === c.clienteId) : null;
+  if (!c) return;
+
+  confirmaAccion(
+    '🔄 Renovar contrato',
+    `<p style="margin-bottom:12px">¿Renovar el contrato <strong>#${c.id}</strong>${cli ? ` de <strong>${cli.nombre}</strong>` : ''}?</p>
+     <p style="color:var(--muted);font-size:12px">Se marcará como <strong>Activo</strong> y la fecha de inicio se actualizará a hoy (${today()}).</p>`,
+    'Renovar contrato',
+    'btn-success',
+    async () => {
+      db.contratos = db.contratos.map(x =>
+        x.id === id ? { ...x, estado: 'Activo', inicio: today() } : x
+      );
+      // Asegurar que la lavadora quede como Rentada
+      if (c.lavadoraId) {
+        db.lavadoras = db.lavadoras.map(l =>
+          l.id === c.lavadoraId ? { ...l, estado: 'Rentada' } : l
+        );
+      }
+      await persist();
+      renderPage(); // Se queda en la misma página
+      toast(`Contrato #${id} renovado ✓`);
+    }
+  );
+}
+
+// ══════════════════════════════════════════════
 //  RENDER
 // ══════════════════════════════════════════════
 function renderPage(){
@@ -642,6 +826,32 @@ function renderDashboard(){
     const c=db.contratos.find(x=>x.id===p.contratoId), cli=c?db.clientes.find(x=>x.id===c.clienteId):null;
     return`<tr><td>${p.fecha}</td><td>${cli?cli.nombre:'—'}</td><td style="color:var(--accent2);font-weight:600">${fmtMXN(p.monto)}</td><td>${badge(p.metodo,'gx')}</td></tr>`;
   }).join('');
+
+  // Tabla de contratos activos — acciones in-place (mejora #2)
+  const contratosActivos = activos.length ? activos.map(c=>{
+    const cli=db.clientes.find(x=>x.id===c.clienteId);
+    const lav=db.lavadoras.find(x=>x.id===c.lavadoraId);
+    const prox=proximaFecha(c);
+    const diff=Math.ceil((new Date(prox)-now)/86400000);
+    const bc=diff<0?'gr':diff<=3?'gy':'gg', bl=diff<0?'Vencido':diff===0?'Hoy':`En ${diff}d`;
+    return`<tr>
+      <td style="color:var(--muted);font-weight:700">#${c.id}</td>
+      <td style="color:var(--muted)">#${c.clienteId}</td>
+      <td style="font-weight:600">${cli?cli.nombre:'—'}</td>
+      <td>${lav?lav.num:'—'}</td>
+      <td style="color:var(--accent2);font-weight:600">${fmtMXN(c.monto)}</td>
+      <td>${badge(c.tipo,'bg')}</td>
+      <td>${c.inicio}</td>
+      <td>${prox} ${badge(bl,bc)}</td>
+      <td>${badge(c.estado,c.estado==='Activo'?'gg':c.estado==='Suspendido'?'gy':'gx')}</td>
+      <td>
+        <button class="action-btn" title="Finalizar" onclick="finalizarContrato(${c.id})">🔴</button>
+        <button class="action-btn" title="Renovar"   onclick="renovarContrato(${c.id})">🔄</button>
+        <button class="action-btn" title="Ver detalle" onclick="verContrato(${c.id})">👁</button>
+      </td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="10"><div class="empty">Sin contratos activos</div></td></tr>';
+
   return`
   <div class="stat-grid">
     <div class="stat-card"><div class="stat-label">Clientes activos</div><div class="stat-value">${activeCli}</div><div class="stat-sub">contratos vigentes</div><div class="stat-icon">👤</div></div>
@@ -652,7 +862,7 @@ function renderDashboard(){
   <div class="two-col">
     <div class="card">
       <div class="card-header"><div class="card-title">Próximos cobros</div>${badge('7 días','bg')}</div>
-      <div class="table-wrap"><table><thead><tr><th>ID Cli.</th><th>Cliente</th><th>Monto</th><th>Próximo cobro</th><th>Estado</th><th></th></tr></thead><tbody>${proxRows||'<tr><td colspan="6"><div class="empty">Sin contratos</div></td></tr>'}</tbody></table></div>
+      <div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Monto</th><th>Próximo cobro</th><th>Estado</th></tr></thead><tbody>${proxRows||'<tr><td colspan="4"><div class="empty">Sin contratos</div></td></tr>'}</tbody></table></div>
     </div>
     <div class="card">
       <div class="card-header"><div class="card-title">Disponibilidad</div>${badge(disp+' disponibles','gg')}</div>
@@ -666,30 +876,8 @@ function renderDashboard(){
   <div class="card">
     <div class="card-header"><div class="card-title">Todos los contratos activos</div>${badge(activos.length,'gg')}</div>
     <div class="table-wrap"><table><thead><tr>
-      <th># Cont.</th><th>ID Cli.</th><th>Cliente</th><th>Lavadora</th><th>Renta</th><th>Tipo</th><th>Inicio</th><th>Próx. pago</th><th>Estatus</th><th></th>
-    </tr></thead><tbody>${activos.length?activos.map(c=>{
-      const cli=db.clientes.find(x=>x.id===c.clienteId);
-      const lav=db.lavadoras.find(x=>x.id===c.lavadoraId);
-      const prox=proximaFecha(c);
-      const diff=Math.ceil((new Date(prox)-now)/86400000);
-      const bc=diff<0?'gr':diff<=3?'gy':'gg', bl=diff<0?'Vencido':diff===0?'Hoy':`En ${diff}d`;
-      return`<tr>
-        <td style="color:var(--muted);font-weight:700">#${c.id}</td>
-        <td style="color:var(--muted)">#${c.clienteId}</td>
-        <td style="font-weight:600">${cli?cli.nombre:'—'}</td>
-        <td>${lav?lav.num:'—'}</td>
-        <td style="color:var(--accent2);font-weight:600">${fmtMXN(c.monto)}</td>
-        <td>${badge(c.tipo,'bg')}</td>
-        <td>${c.inicio}</td>
-        <td>${prox} ${badge(bl,bc)}</td>
-        <td>${badge(c.estado,c.estado==='Activo'?'gg':c.estado==='Suspendido'?'gy':'gx')}</td>
-        <td>
-          <button class="action-btn" title="Finalizar" onclick="finalizarContrato(${c.id})">🔴</button>
-          <button class="action-btn" title="Renovar" onclick="renovarContrato(${c.id})">🔄</button>
-          <button class="action-btn" title="Ver detalle" onclick="goPage('contratos');setTimeout(()=>verContrato(${c.id}),100)">👁</button>
-        </td>
-      </tr>`;
-    }).join(''):'<tr><td colspan="10"><div class="empty">Sin contratos activos</div></td></tr>'}</tbody></table></div>
+      <th># Cont.</th><th>ID Cli.</th><th>Cliente</th><th>Lavadora</th><th>Renta</th><th>Tipo</th><th>Inicio</th><th>Próx. pago</th><th>Estatus</th><th>Acciones</th>
+    </tr></thead><tbody>${contratosActivos}</tbody></table></div>
   </div>
   <div class="card">
     <div class="card-header"><div class="card-title">Últimos pagos</div></div>
@@ -778,20 +966,29 @@ function renderContratos(){
     const cli=db.clientes.find(x=>x.id===c.clienteId);
     return(!q||cli?.nombre.toLowerCase().includes(q)||String(c.id).includes(q))&&(!est||c.estado===est)&&(!tipo||c.tipo===tipo);
   });
+
+  const now = new Date();
   const rows=data.map(c=>{
     const cli=db.clientes.find(x=>x.id===c.clienteId), lav=db.lavadoras.find(x=>x.id===c.lavadoraId);
     const bc=c.estado==='Activo'?'gg':c.estado==='Suspendido'?'gy':'gx';
+    const prox = c.estado === 'Activo' ? proximaFecha(c) : '—';
+    const diff = c.estado === 'Activo' ? Math.ceil((new Date(prox) - now) / 86400000) : null;
+    const pagoBadge = diff !== null ? (diff < 0 ? badge('Vencido','gr') : diff <= 3 ? badge('Por vencer','gy') : badge('Al corriente','gg')) : '';
     return`<tr>
       <td style="color:var(--muted);font-weight:700">#${c.id}</td>
       <td style="color:var(--muted)">#${c.clienteId}</td>
       <td style="font-weight:600">${cli?cli.nombre:'—'}</td>
       <td>${lav?lav.num+' · '+lav.marca:'—'}</td>
       <td style="color:var(--accent2);font-weight:600">${fmtMXN(c.monto)}</td>
-      <td>${badge(c.tipo,'bg')}</td><td>${badge(c.estado,bc)}</td>
+      <td>${badge(c.tipo,'bg')}</td>
+      <td>${badge(c.estado,bc)}</td>
+      <td>${prox !== '—' ? prox+' '+pagoBadge : '—'}</td>
       <td>
-        <button class="action-btn" onclick="verContrato(${c.id})">👁</button>
-        <button class="action-btn" onclick="editContrato(${c.id})">✏️</button>
-        <button class="action-btn" onclick="delContrato(${c.id})">🗑</button>
+        <button class="action-btn" title="Ver" onclick="verContrato(${c.id})">👁</button>
+        <button class="action-btn" title="Editar" onclick="editContrato(${c.id})">✏️</button>
+        ${c.estado==='Activo'?`<button class="action-btn" title="Renovar" onclick="renovarContrato(${c.id})">🔄</button>
+        <button class="action-btn" title="Finalizar" onclick="finalizarContrato(${c.id})">🔴</button>`:''}
+        <button class="action-btn" title="Eliminar" onclick="delContrato(${c.id})">🗑</button>
       </td>
     </tr>`;
   }).join('');
@@ -808,15 +1005,17 @@ function renderContratos(){
   </div>
   <div class="card">
     <div class="card-header"><div class="card-title">Contratos de renta</div>${badge(data.length,'bg')}</div>
-    <div class="table-wrap"><table><thead><tr><th>#</th><th>Cliente</th><th>Lavadora</th><th>Renta</th><th>Tipo</th><th>Estado</th><th></th></tr></thead>
-    <tbody>${rows||'<tr><td colspan="7"><div class="empty"><div class="empty-icon">📋</div><p>Sin contratos</p></div></td></tr>'}</tbody></table></div>
+    <div class="table-wrap"><table><thead><tr><th>#</th><th>ID Cli.</th><th>Cliente</th><th>Lavadora</th><th>Renta</th><th>Tipo</th><th>Estado</th><th>Próx. pago</th><th>Acciones</th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="9"><div class="empty"><div class="empty-icon">📋</div><p>Sin contratos</p></div></td></tr>'}</tbody></table></div>
   </div>`;
 }
 function openFormContrato(c){
   document.getElementById('ctId').value=c?c.id:'';
   document.getElementById('ctCliente').innerHTML=db.clientes.map(x=>`<option value="${x.id}"${c&&c.clienteId===x.id?' selected':''}>${x.nombre}</option>`).join('');
   document.getElementById('ctLavadora').innerHTML=db.lavadoras.map(x=>`<option value="${x.id}"${c&&c.lavadoraId===x.id?' selected':''}>${x.num} · ${x.marca} (${x.estado})</option>`).join('');
-  document.getElementById('ctInicio').value=c?c.inicio:today(); document.getElementById('ctTipo').value=c?c.tipo:'Mensual';
+  // Mejora #3: fecha de hoy como predeterminada en nuevos contratos
+  document.getElementById('ctInicio').value=c?c.inicio:today();
+  document.getElementById('ctTipo').value=c?c.tipo:'Mensual';
   document.getElementById('ctMonto').value=c?c.monto:''; document.getElementById('ctEstado').value=c?c.estado:'Activo';
   document.getElementById('ctDir').value=c?c.dir:''; document.getElementById('ctNotas').value=c?c.notas:'';
   document.getElementById('mContTitle').textContent=c?'Editar contrato':'Nuevo contrato';
@@ -845,10 +1044,17 @@ function verContrato(id){
     <div class="summary-grid">
       <div><div class="sum-val" style="color:var(--accent)">${ps.length}</div><div class="sum-label">Pagos</div></div>
       <div><div class="sum-val" style="color:var(--accent2);font-size:16px">${fmtMXN(total)}</div><div class="sum-label">Recaudado</div></div>
-      <div><div class="sum-val" style="color:var(--warn);font-size:13px">${proximaFecha(c)}</div><div class="sum-label">Próximo pago</div></div>
+      <div><div class="sum-val" style="color:var(--warn);font-size:13px">${c.estado==='Activo'?proximaFecha(c):'—'}</div><div class="sum-label">Próximo pago</div></div>
     </div>
     ${[['Cliente',cli?.nombre||'—'],['Lavadora',lav?lav.num+' · '+lav.marca:'—'],['Inicio',c.inicio],['Tipo',c.tipo],['Renta',fmtMXN(c.monto)],['Estado',c.estado]].map(([k,v])=>`<div class="detail-row"><span class="dk">${k}</span><span class="dv">${v}</span></div>`).join('')}`;
-  document.getElementById('mDetFoot').innerHTML=`<button class="btn btn-secondary" onclick="closeModal('modal-detalle')">Cerrar</button><button class="btn btn-primary" onclick="closeModal('modal-detalle');editContrato(${id})">Editar</button>`;
+  const acciones = c.estado === 'Activo'
+    ? `<button class="btn btn-warn btn-sm" onclick="closeModal('modal-detalle');renovarContrato(${id})">🔄 Renovar</button>
+       <button class="btn btn-danger btn-sm" onclick="closeModal('modal-detalle');finalizarContrato(${id})">🔴 Finalizar</button>`
+    : '';
+  document.getElementById('mDetFoot').innerHTML=`
+    <button class="btn btn-secondary" onclick="closeModal('modal-detalle')">Cerrar</button>
+    ${acciones}
+    <button class="btn btn-primary" onclick="closeModal('modal-detalle');editContrato(${id})">✏️ Editar</button>`;
   openModal('modal-detalle');
 }
 
@@ -1091,7 +1297,6 @@ async function init(){
   document.getElementById('topDate').textContent =
     new Date().toLocaleDateString('es-MX',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
 
-  // Tecla Enter en login
   ['loginEmail','loginPassword'].forEach(id=>{
     document.getElementById(id).addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
   });
@@ -1107,6 +1312,7 @@ async function init(){
       localStorage.setItem(LS_RTOKEN, s.refresh_token);
       setUserUI(currentUser);
       await loadAndBoot();
+      startInactivityWatcher(); // Iniciar vigilancia tras reanudar sesión
       return;
     } catch(e){
       localStorage.removeItem(LS_TOKEN); localStorage.removeItem(LS_RTOKEN);
