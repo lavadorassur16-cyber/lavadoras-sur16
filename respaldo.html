@@ -249,6 +249,7 @@ tr:hover td{background:#F7F9FF}
       <div class="login-spinner" id="loginSpinner">🌀 Verificando…</div>
     </div>
     <div class="login-footer">Sistema privado — solo usuarios autorizados</div>
+    <div class="login-footer">Desarrollado por Solutecnosin®</div>
   </div>
 </div>
 
@@ -555,8 +556,8 @@ function proximaFecha(c){
   const ps=[...db.pagos].filter(p=>p.contratoId===c.id).sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
   const base=ps.length?new Date(ps[0].fecha):new Date(c.inicio);
   const n=new Date(base);
-  if(c.tipo==='Mensual')n.setMonth(n.getMonth()+1);
-  else if(c.tipo==='Quincenal')n.setDate(n.getDate()+15);
+  if(c.tipo==='Mensual')n.setDate(n.getDate()+28);
+  else if(c.tipo==='Quincenal')n.setDate(n.getDate()+14);
   else n.setDate(n.getDate()+7);
   return fmtDate(n);
 }
@@ -567,11 +568,12 @@ function pagoInicialContrato(c){
   return ps.length?ps[0].monto:0;
 }
 function porCobrarContrato(c){
-  // Meses/periodos desde inicio hasta hoy × monto − total pagado
+  // Periodos desde inicio hasta hoy × monto − total pagado
+  // Mensual = 28 días, Quincenal = 14 días, Semanal = 7 días
   const ini=new Date(c.inicio),now=new Date();
   let periodos=0;
-  if(c.tipo==='Mensual')periodos=Math.max(0,Math.floor((now-ini)/(30.44*86400000))+1);
-  else if(c.tipo==='Quincenal')periodos=Math.max(0,Math.floor((now-ini)/(15*86400000))+1);
+  if(c.tipo==='Mensual')periodos=Math.max(0,Math.floor((now-ini)/(28*86400000))+1);
+  else if(c.tipo==='Quincenal')periodos=Math.max(0,Math.floor((now-ini)/(14*86400000))+1);
   else periodos=Math.max(0,Math.floor((now-ini)/(7*86400000))+1);
   const esperado=periodos*c.monto;
   const pagado=db.pagos.filter(p=>p.contratoId===c.id).reduce((s,p)=>s+p.monto,0);
@@ -711,12 +713,19 @@ async function finalizarContrato(id){
 async function renovarContrato(id){
   const c=db.contratos.find(x=>x.id===id),cli=c?db.clientes.find(x=>x.id===c.clienteId):null;if(!c)return;
   confirmaAccion('🔄 Renovar contrato',
-    `<p style="margin-bottom:12px">¿Renovar el contrato <strong>#${c.id}</strong>${cli?` de <strong>${cli.nombre}</strong>`:''}?</p>
-     <p style="color:var(--muted);font-size:12px">Se marcará Activo y la fecha de inicio será hoy (${today()}).</p>`,
+    `<p style="margin-bottom:10px">¿Renovar el contrato <strong>#${c.id}</strong>${cli?` de <strong>${cli.nombre}</strong>`:''}?</p>
+     <div style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:12px 14px;margin-bottom:8px">
+       <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);display:block;margin-bottom:6px">Nueva fecha de inicio</label>
+       <input type="date" id="renovarFechaInput" value="${today()}" max="${today()}" style="width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;color:var(--text);outline:none">
+     </div>
+     <p style="color:var(--muted);font-size:12px">El contrato se marcará como Activo con la fecha seleccionada.</p>`,
     'Renovar','btn-success',async()=>{
-      db.contratos=db.contratos.map(x=>x.id===id?{...x,estado:'Activo',inicio:today()}:x);
+      const fechaInput=document.getElementById('renovarFechaInput');
+      const nuevaFecha=fechaInput?fechaInput.value:today();
+      if(!nuevaFecha){toast('Selecciona una fecha de inicio','e');return;}
+      db.contratos=db.contratos.map(x=>x.id===id?{...x,estado:'Activo',inicio:nuevaFecha}:x);
       if(c.lavadoraId)db.lavadoras=db.lavadoras.map(l=>l.id===c.lavadoraId?{...l,estado:'Rentada'}:l);
-      await persist();renderPage();toast(`Contrato #${id} renovado ✓`);
+      await persist();renderPage();toast(`Contrato #${id} renovado desde ${nuevaFecha} ✓`);
     });
 }
 
