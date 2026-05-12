@@ -547,7 +547,12 @@ async function persist(){lsSave();if(usingCloud)await cloudSave();}
 //  UTILS
 // ══════════════════════════════════════════════
 const fmtDate=d=>d instanceof Date?d.toISOString().split('T')[0]:d;
-const today=()=>fmtDate(new Date());
+const today=()=>{
+  // Zona horaria Mazatlán (America/Mazatlan, UTC-7)
+  const d=new Date();
+  const mzt=new Date(d.toLocaleString('en-US',{timeZone:'America/Mazatlan'}));
+  return mzt.getFullYear()+'-'+String(mzt.getMonth()+1).padStart(2,'0')+'-'+String(mzt.getDate()).padStart(2,'0');
+};
 const fmtMXN=n=>'$'+Number(n).toLocaleString('es-MX');
 const nextId=a=>a.length?Math.max(...a.map(x=>x.id))+1:1;
 const qs=s=>document.querySelector(s);
@@ -749,9 +754,9 @@ function renderPage(){
 
 // ── DASHBOARD ──────────────────────────────────
 function calcPendientes(){
-  const now=new Date();
+  const todayMzt=today();
   return db.contratos.filter(c=>c.estado==='Activo').map(c=>{
-    const prox=proximaFecha(c),diff=Math.ceil((new Date(prox)-now)/86400000);
+    const prox=proximaFecha(c),diff=Math.ceil((new Date(prox)-new Date(todayMzt))/86400000);
     const status=diff<0?'Vencido':diff<=3?'Por vencer':'Al corriente';
     return{...c,prox,diff,status};
   }).filter(c=>c.status!=='Al corriente');
@@ -760,7 +765,9 @@ function renderDashboard(){
   const now=new Date(),m=now.getMonth(),y=now.getFullYear();
   const cobrosMes=db.pagos.filter(p=>{const d=new Date(p.fecha);return d.getMonth()===m&&d.getFullYear()===y;}).reduce((s,p)=>s+p.monto,0);
   const activos=db.contratos.filter(c=>c.estado==='Activo');
-  const rentadas=db.lavadoras.filter(l=>l.estado==='Rentada').length,totalLav=db.lavadoras.length;
+  // Lavadoras rentadas = lavadoras con al menos un contrato activo (fuente de verdad)
+  const lavIdsActivos=new Set(db.contratos.filter(c=>c.estado==='Activo'&&c.lavadoraId).map(c=>c.lavadoraId));
+  const rentadas=lavIdsActivos.size,totalLav=db.lavadoras.length;
   const disp=db.lavadoras.filter(l=>l.estado==='Disponible').length,mant=db.lavadoras.filter(l=>l.estado==='Mantenimiento').length;
   const vencidos=calcPendientes().filter(v=>v.status==='Vencido').length;
   const activeCli=db.clientes.filter(c=>c.estado==='Activo').length;
@@ -771,9 +778,10 @@ function renderDashboard(){
   const ss=sortState['dashboard-contratos'];
   if(ss&&ss.key)activosSorted=sortData(activos,ss.key,ss.dir);
 
+  const todayMzt=today();
   const proxRows=activos.slice(0,5).map(c=>{
     const cli=db.clientes.find(x=>x.id===c.clienteId),prox=proximaFecha(c);
-    const diff=Math.ceil((new Date(prox)-now)/86400000);
+    const diff=Math.ceil((new Date(prox)-new Date(todayMzt))/86400000);
     const bc=diff<0?'gr':diff<=3?'gy':'gg',bl=diff<0?'Vencido':diff===0?'Hoy':`En ${diff}d`;
     return`<tr><td style="font-weight:600">${cli?cli.nombre:'—'}</td><td style="color:var(--accent2);font-weight:600">${fmtMXN(c.monto)}</td><td>${prox}</td><td>${badge(bl,bc)}</td></tr>`;
   }).join('');
@@ -786,7 +794,7 @@ function renderDashboard(){
   // #4 columnas pago inicial y por cobrar
   const contratosRows=activosSorted.length?activosSorted.map(c=>{
     const cli=db.clientes.find(x=>x.id===c.clienteId),lav=db.lavadoras.find(x=>x.id===c.lavadoraId);
-    const prox=proximaFecha(c),diff=Math.ceil((new Date(prox)-now)/86400000);
+    const prox=proximaFecha(c),diff=Math.ceil((new Date(prox)-new Date(todayMzt))/86400000);
     const bc=diff<0?'gr':diff<=3?'gy':'gg',bl=diff<0?'Vencido':diff===0?'Hoy':`En ${diff}d`;
     const pInicial=pagoInicialContrato(c),pCobrar=porCobrarContrato(c);
     return`<tr>
@@ -1288,7 +1296,9 @@ async function delPago(id){
 function renderReportes(){
   const total=db.pagos.reduce((s,p)=>s+p.monto,0);
   const activos=db.contratos.filter(c=>c.estado==='Activo');
-  const rentadas=db.lavadoras.filter(l=>l.estado==='Rentada').length,totalLav=db.lavadoras.length;
+  // Lavadoras rentadas = lavadoras con al menos un contrato activo (fuente de verdad)
+  const lavIdsActivos=new Set(db.contratos.filter(c=>c.estado==='Activo'&&c.lavadoraId).map(c=>c.lavadoraId));
+  const rentadas=lavIdsActivos.size,totalLav=db.lavadoras.length;
   const prom=activos.length?activos.reduce((s,c)=>s+c.monto,0)/activos.length:0;
   const venc=calcPendientes().filter(v=>v.status==='Vencido').length;
   const mora=activos.length?Math.round(venc/activos.length*100):0;
@@ -1340,7 +1350,7 @@ function generarChecklist(){
   if(tipo==='contratos'||tipo==='ambos'){
     db.contratos.filter(c=>c.estado==='Activo').forEach(c=>{
       const cli=db.clientes.find(x=>x.id===c.clienteId),lav=db.lavadoras.find(x=>x.id===c.lavadoraId);
-      const prox=proximaFecha(c),diff=Math.ceil((new Date(prox)-new Date())/86400000);
+      const prox=proximaFecha(c),diff=Math.ceil((new Date(prox)-new Date(today()))/86400000);
       checklistItems.push({
         id:'ct-'+c.id,done:false,
         label:`Contrato #${c.id} — ${cli?cli.nombre:'—'} (${lav?lav.num:'—'})`,
