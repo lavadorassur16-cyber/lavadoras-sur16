@@ -1045,7 +1045,7 @@ function openFormContrato(c){
   }).join('');
   document.getElementById('ctLavadora').innerHTML=lavOptions||'<option value="">— Sin lavadoras disponibles —</option>';
   document.getElementById('ctInicio').value=c?c.inicio:today();
-  document.getElementById('ctTipo').value=c?c.tipo:'Mensual';
+  document.getElementById('ctTipo').value=c?c.tipo:'Semanal';
   document.getElementById('ctMonto').value=c?c.monto:'';
   document.getElementById('ctEstado').value=c?c.estado:'Activo';
   document.getElementById('ctDir').value=c?c.dir:'';
