@@ -548,7 +548,6 @@ async function persist(){lsSave();if(usingCloud)await cloudSave();}
 // ══════════════════════════════════════════════
 const fmtDate=d=>d instanceof Date?d.toISOString().split('T')[0]:d;
 const today=()=>{
-  // Zona horaria Mazatlán (America/Mazatlan, UTC-7)
   const d=new Date();
   const mzt=new Date(d.toLocaleString('en-US',{timeZone:'America/Mazatlan'}));
   return mzt.getFullYear()+'-'+String(mzt.getMonth()+1).padStart(2,'0')+'-'+String(mzt.getDate()).padStart(2,'0');
@@ -573,8 +572,7 @@ function pagoInicialContrato(c){
   return ps.length?ps[0].monto:0;
 }
 function porCobrarContrato(c){
-  // Periodos desde inicio hasta hoy × monto − total pagado
-  // Mensual = 28 días, Quincenal = 14 días, Semanal = 7 días
+  // Meses/periodos desde inicio hasta hoy × monto − total pagado
   const ini=new Date(c.inicio),now=new Date();
   let periodos=0;
   if(c.tipo==='Mensual')periodos=Math.max(0,Math.floor((now-ini)/(28*86400000))+1);
@@ -721,7 +719,7 @@ async function renovarContrato(id){
     `<p style="margin-bottom:10px">¿Renovar el contrato <strong>#${c.id}</strong>${cli?` de <strong>${cli.nombre}</strong>`:''}?</p>
      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:12px 14px;margin-bottom:8px">
        <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);display:block;margin-bottom:6px">Nueva fecha de inicio</label>
-       <input type="date" id="renovarFechaInput" value="${today()}" max="${today()}" style="width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;color:var(--text);outline:none">
+       <input type="date" id="renovarFechaInput" value="${today()}" style="width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;color:var(--text);outline:none">
      </div>
      <p style="color:var(--muted);font-size:12px">El contrato se marcará como Activo con la fecha seleccionada.</p>`,
     'Renovar','btn-success',async()=>{
@@ -765,9 +763,7 @@ function renderDashboard(){
   const now=new Date(),m=now.getMonth(),y=now.getFullYear();
   const cobrosMes=db.pagos.filter(p=>{const d=new Date(p.fecha);return d.getMonth()===m&&d.getFullYear()===y;}).reduce((s,p)=>s+p.monto,0);
   const activos=db.contratos.filter(c=>c.estado==='Activo');
-  // Lavadoras rentadas = lavadoras con al menos un contrato activo (fuente de verdad)
-  const lavIdsActivos=new Set(db.contratos.filter(c=>c.estado==='Activo'&&c.lavadoraId).map(c=>c.lavadoraId));
-  const rentadas=lavIdsActivos.size,totalLav=db.lavadoras.length;
+  const rentadas=db.contratos.filter(c=>c.estado==='Activo').length,totalLav=db.lavadoras.length;
   const disp=db.lavadoras.filter(l=>l.estado==='Disponible').length,mant=db.lavadoras.filter(l=>l.estado==='Mantenimiento').length;
   const vencidos=calcPendientes().filter(v=>v.status==='Vencido').length;
   const activeCli=db.clientes.filter(c=>c.estado==='Activo').length;
@@ -820,7 +816,7 @@ function renderDashboard(){
   return`
   <div class="page-heading"><span>⊞</span>Inicio</div>
   <div class="stat-grid">
-    <div class="stat-card"><div class="stat-label">Clientes activos</div><div class="stat-value">${activeCli}</div><div class="stat-icon">👤</div></div>
+    <div class="stat-card"><div class="stat-label">Clientes activos</div><div class="stat-value">${activeCli}</div><div class="stat-sub">${db.clientes.filter(c=>c.estado==='Inactivo').length} inactivos · ${db.clientes.length} total</div><div class="stat-icon">👤</div></div>
     <div class="stat-card green"><div class="stat-label">Lavadoras rentadas</div><div class="stat-value">${rentadas}</div><div class="stat-sub">de ${totalLav} en inventario</div><div class="stat-icon">🌀</div></div>
     <div class="stat-card yellow"><div class="stat-label">Cobros este mes</div><div class="stat-value" style="font-size:22px">${fmtMXN(cobrosMes)}</div><div class="stat-sub">pagos recibidos</div><div class="stat-icon">💰</div></div>
     <div class="stat-card red"><div class="stat-label">Pagos vencidos</div><div class="stat-value">${vencidos}</div><div class="stat-sub">clientes con mora</div><div class="stat-icon">⚠️</div></div>
@@ -848,6 +844,7 @@ function renderDashboard(){
       <th>Lavadora</th>
       ${thSort('dashboard-contratos','monto','Renta')}
       ${thSort('dashboard-contratos','tipo','Tipo')}
+      ${thSort('dashboard-contratos','lavadoraId','Lavadora')}
       ${thSort('dashboard-contratos','inicio','Inicio')}
       <th>Próx. pago</th>
       <th>Pago inicial</th>
@@ -962,12 +959,12 @@ function renderContratos(){
   const ssa=sortState['contratos-activos'];if(ssa&&ssa.key)activos=sortData(activos,ssa.key,ssa.dir);
   const ssf=sortState['contratos-final'];if(ssf&&ssf.key)finalizados=sortData(finalizados,ssf.key,ssf.dir);
 
-  const now=new Date();
+  const todayMztCt=today();
   const buildRow=(c,seccion)=>{
     const cli=db.clientes.find(x=>x.id===c.clienteId),lav=db.lavadoras.find(x=>x.id===c.lavadoraId);
     const bc=c.estado==='Activo'?'gg':c.estado==='Suspendido'?'gy':'gx';
     const prox=c.estado==='Activo'?proximaFecha(c):'—';
-    const diff=c.estado==='Activo'?Math.ceil((new Date(prox)-now)/86400000):null;
+    const diff=c.estado==='Activo'?Math.ceil((new Date(prox)-new Date(todayMztCt))/86400000):null;
     const pagoBadge=diff!==null?(diff<0?badge('Vencido','gr'):diff<=3?badge('Por vencer','gy'):badge('Al corriente','gg')):'';
     const pInicial=pagoInicialContrato(c),pCobrar=porCobrarContrato(c);
     return`<tr>
@@ -993,7 +990,7 @@ function renderContratos(){
   const headRow=(seccion)=>`<tr>
     ${thSort(seccion,'id','#')}
     ${thSort(seccion,'clienteId','ID Cli.')}
-    <th>Cliente</th><th>Lavadora</th>
+    <th>Cliente</th>${thSort(seccion,'lavadoraId','Lavadora')}
     ${thSort(seccion,'monto','Renta')}
     ${thSort(seccion,'tipo','Tipo')}
     ${thSort(seccion,'estado','Estado')}
@@ -1036,7 +1033,17 @@ function onCtClienteChange(){
 function openFormContrato(c){
   document.getElementById('ctId').value=c?c.id:'';
   document.getElementById('ctCliente').innerHTML=db.clientes.map(x=>`<option value="${x.id}"${c&&c.clienteId===x.id?' selected':''}>🔹 #${x.id} — ${x.nombre}</option>`).join('');
-  document.getElementById('ctLavadora').innerHTML=db.lavadoras.map(x=>`<option value="${x.id}"${c&&c.lavadoraId===x.id?' selected':''}>${x.num} · ${x.marca} (${x.estado})</option>`).join('');
+  // Solo mostrar Disponibles + la actual del contrato (si se está editando)
+  const lavOptions=db.lavadoras.filter(x=>{
+    const tieneContratoActivo=db.contratos.some(ct=>ct.lavadoraId===x.id&&ct.estado==='Activo'&&(!c||ct.id!==c.id));
+    if(tieneContratoActivo) return false; // Rentada por otro contrato activo
+    if(x.estado==='Mantenimiento'&&(!c||c.lavadoraId!==x.id)) return false; // En mantenimiento
+    return true;
+  }).map(x=>{
+    const estadoReal=db.contratos.some(ct=>ct.lavadoraId===x.id&&ct.estado==='Activo')?'Rentada':x.estado;
+    return`<option value="${x.id}"${c&&c.lavadoraId===x.id?' selected':''}>${x.num} · ${x.marca} (${estadoReal})</option>`;
+  }).join('');
+  document.getElementById('ctLavadora').innerHTML=lavOptions||'<option value="">— Sin lavadoras disponibles —</option>';
   document.getElementById('ctInicio').value=c?c.inicio:today();
   document.getElementById('ctTipo').value=c?c.tipo:'Mensual';
   document.getElementById('ctMonto').value=c?c.monto:'';
@@ -1058,6 +1065,11 @@ async function guardarContrato(){
   const id=document.getElementById('ctId').value;
   const cliId=Number(document.getElementById('ctCliente').value),lavId=Number(document.getElementById('ctLavadora').value),monto=document.getElementById('ctMonto').value;
   if(!cliId||!lavId||!monto){toast('Completa los campos obligatorios','e');return;}
+  // Validar que la lavadora esté disponible (no rentada por otro contrato activo ni en mantenimiento)
+  const lavSel=db.lavadoras.find(l=>l.id===lavId);
+  const contratoActivoLav=db.contratos.find(ct=>ct.lavadoraId===lavId&&ct.estado==='Activo'&&(!id||ct.id!==Number(id)));
+  if(contratoActivoLav){toast('Esa lavadora ya tiene un contrato activo (#'+contratoActivoLav.id+')','e');return;}
+  if(lavSel&&lavSel.estado==='Mantenimiento'&&(!id||db.contratos.find(ct=>ct.id===Number(id))?.lavadoraId!==lavId)){toast('Esa lavadora está en Mantenimiento y no puede rentarse','e');return;}
   const data={clienteId:cliId,lavadoraId:lavId,monto:Number(monto),inicio:document.getElementById('ctInicio').value,tipo:document.getElementById('ctTipo').value,estado:document.getElementById('ctEstado').value,dir:document.getElementById('ctDir').value,notas:document.getElementById('ctNotas').value};
   let newId;
   if(id){db.contratos=db.contratos.map(c=>c.id==id?{...c,...data}:c);toast('Contrato actualizado');newId=Number(id);}
@@ -1099,14 +1111,17 @@ function renderLavadoras(){
   const rows=data.map(l=>{
     const cont=db.contratos.find(c=>c.lavadoraId===l.id&&c.estado==='Activo');
     const cli=cont?db.clientes.find(c=>c.id===cont.clienteId):null;
+    // Estado derivado automáticamente: si tiene contrato activo = Rentada, si no mantiene su estado manual
+    const estadoReal=cont?'Rentada':l.estado;
     return`<tr>
       <td style="font-weight:700;color:var(--accent)">${l.num}</td>
       <td>${l.marca}</td>
       <td>${l.modelo||'—'}</td>
       <td>${l.cap?l.cap+' kg':'—'}</td>
       <td>${l.anio||'—'}</td>
-      <td>${stBadge(l.estado)}</td>
-      <td style="color:var(--muted)">${cli?`#${cli.id} · ${cli.nombre}`:'—'}</td>
+      <td>${stBadge(estadoReal)}</td>
+      <td style="color:var(--muted)">${cli?`#${cli.id}`:'—'}</td>
+      <td style="font-weight:600">${cli?cli.nombre:'—'}</td>
       <td>
         <button class="action-btn" onclick="verLavadora(${l.id})">👁</button>
         <button class="action-btn" onclick="editLavadora(${l.id})">✏️</button>
@@ -1132,7 +1147,7 @@ function renderLavadoras(){
       ${thSort('lavadoras','cap','Capacidad')}
       ${thSort('lavadoras','anio','Año')}
       ${thSort('lavadoras','estado','Estado')}
-      <th>ID · Cliente</th><th></th>
+      <th>ID Cli.</th><th>Cliente</th><th></th>
     </tr></thead><tbody>${rows||'<tr><td colspan="8"><div class="empty"><div class="empty-icon">🌀</div><p>Sin lavadoras</p></div></td></tr>'}</tbody></table></div>
   </div>`;
 }
@@ -1296,9 +1311,7 @@ async function delPago(id){
 function renderReportes(){
   const total=db.pagos.reduce((s,p)=>s+p.monto,0);
   const activos=db.contratos.filter(c=>c.estado==='Activo');
-  // Lavadoras rentadas = lavadoras con al menos un contrato activo (fuente de verdad)
-  const lavIdsActivos=new Set(db.contratos.filter(c=>c.estado==='Activo'&&c.lavadoraId).map(c=>c.lavadoraId));
-  const rentadas=lavIdsActivos.size,totalLav=db.lavadoras.length;
+  const rentadas=db.contratos.filter(c=>c.estado==='Activo').length,totalLav=db.lavadoras.length;
   const prom=activos.length?activos.reduce((s,c)=>s+c.monto,0)/activos.length:0;
   const venc=calcPendientes().filter(v=>v.status==='Vencido').length;
   const mora=activos.length?Math.round(venc/activos.length*100):0;
