@@ -249,7 +249,6 @@ tr:hover td{background:#F7F9FF}
       <div class="login-spinner" id="loginSpinner">🌀 Verificando…</div>
     </div>
     <div class="login-footer">Sistema privado — solo usuarios autorizados</div>
-    <div class="login-footer">Desarrollado por Solutecnosin®</div>
   </div>
 </div>
 
@@ -347,9 +346,9 @@ tr:hover td{background:#F7F9FF}
         <div class="form-group"><label class="form-label">Fecha inicio *</label><input class="form-input" type="date" id="ctInicio"></div>
         <div class="form-group"><label class="form-label">Tipo de pago</label>
           <select class="form-select" id="ctTipo">
-            <option>Semanal</option>
+            <option>Mensual</option>
             <option>Quincenal</option>
-            <option>Mensual</option>      
+            <option>Semanal</option>
           </select>
         </div>
         <div class="form-group"><label class="form-label">Monto renta *</label><input class="form-input" type="number" id="ctMonto" placeholder="$0.00"></div>
@@ -390,12 +389,31 @@ tr:hover td{background:#F7F9FF}
         <div class="form-group"><label class="form-label">Marca *</label><input class="form-input" id="lMarca" placeholder="Mabe, Samsung..."></div>
         <div class="form-group"><label class="form-label">Modelo</label><input class="form-input" id="lModelo" placeholder="WH1234"></div>
         <div class="form-group"><label class="form-label">Capacidad (kg)</label><input class="form-input" type="number" id="lCap" placeholder="16"></div>
-        <div class="form-group"><label class="form-label">Estado</label><select class="form-select" id="lEstado"><option>Disponible</option><option>Rentada</option><option>Mantenimiento</option></select></div>
+        <div class="form-group"><label class="form-label">Estado</label><select class="form-select" id="lEstado"><option>Disponible</option><option>Rentada</option><option>Mantenimiento</option><option>Vendida</option></select></div>
         <div class="form-group"><label class="form-label">Año</label><input class="form-input" type="number" id="lAnio" placeholder="2022"></div>
         <div class="form-group full"><label class="form-label">Notas</label><textarea class="form-textarea" id="lNotas" rows="2"></textarea></div>
       </div>
     </div>
     <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('modal-lavadora')">Cancelar</button><button class="btn btn-primary" onclick="guardarLavadora()">Guardar</button></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal-venta">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title" id="mVenTitle">Nueva venta</div><button class="modal-close" onclick="closeModal('modal-venta')">×</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <input type="hidden" id="vId">
+        <div class="form-group full"><label class="form-label">Lavadora * (solo disponibles)</label><select class="form-select" id="vLavadora"></select></div>
+        <div class="form-group full"><label class="form-label">Cliente comprador</label><select class="form-select" id="vCliente" onchange="onVentaClienteChange()"></select></div>
+        <div class="form-group full" id="vNombreWrap"><label class="form-label">Nombre del comprador</label><input class="form-input" id="vNombre" placeholder="Si no está registrado como cliente"></div>
+        <div class="form-group"><label class="form-label">Fecha de venta *</label><input class="form-input" type="date" id="vFecha"></div>
+        <div class="form-group"><label class="form-label">Precio de venta *</label><input class="form-input" type="number" id="vPrecio" placeholder="$0.00"></div>
+        <div class="form-group"><label class="form-label">Método de pago</label><select class="form-select" id="vMetodo"><option>Efectivo</option><option>Transferencia</option><option>Tarjeta</option></select></div>
+        <div class="form-group full"><label class="form-label">Notas</label><textarea class="form-textarea" id="vNotas" rows="2"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('modal-venta')">Cancelar</button><button class="btn btn-primary" onclick="guardarVenta()">Guardar</button></div>
   </div>
 </div>
 
@@ -541,17 +559,14 @@ async function cloudSave(){
 }
 function lsSave(){try{localStorage.setItem(LS_KEY,JSON.stringify(db));}catch(e){}}
 function lsLoad(){try{const r=localStorage.getItem(LS_KEY);if(r){db=JSON.parse(r);return true;}}catch(e){}return false;}
-async function persist(){lsSave();if(usingCloud)await cloudSave();}
+function ensureDb(){db.ventas=db.ventas||[];}
+async function persist(){ensureDb();lsSave();if(usingCloud)await cloudSave();}
 
 // ══════════════════════════════════════════════
 //  UTILS
 // ══════════════════════════════════════════════
 const fmtDate=d=>d instanceof Date?d.toISOString().split('T')[0]:d;
-const today=()=>{
-  const d=new Date();
-  const mzt=new Date(d.toLocaleString('en-US',{timeZone:'America/Mazatlan'}));
-  return mzt.getFullYear()+'-'+String(mzt.getMonth()+1).padStart(2,'0')+'-'+String(mzt.getDate()).padStart(2,'0');
-};
+const today=()=>fmtDate(new Date());
 const fmtMXN=n=>'$'+Number(n).toLocaleString('es-MX');
 const nextId=a=>a.length?Math.max(...a.map(x=>x.id))+1:1;
 const qs=s=>document.querySelector(s);
@@ -560,8 +575,8 @@ function proximaFecha(c){
   const ps=[...db.pagos].filter(p=>p.contratoId===c.id).sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
   const base=ps.length?new Date(ps[0].fecha):new Date(c.inicio);
   const n=new Date(base);
-  if(c.tipo==='Mensual')n.setDate(n.getDate()+28);
-  else if(c.tipo==='Quincenal')n.setDate(n.getDate()+14);
+  if(c.tipo==='Mensual')n.setMonth(n.getMonth()+1);
+  else if(c.tipo==='Quincenal')n.setDate(n.getDate()+15);
   else n.setDate(n.getDate()+7);
   return fmtDate(n);
 }
@@ -575,8 +590,8 @@ function porCobrarContrato(c){
   // Meses/periodos desde inicio hasta hoy × monto − total pagado
   const ini=new Date(c.inicio),now=new Date();
   let periodos=0;
-  if(c.tipo==='Mensual')periodos=Math.max(0,Math.floor((now-ini)/(28*86400000))+1);
-  else if(c.tipo==='Quincenal')periodos=Math.max(0,Math.floor((now-ini)/(14*86400000))+1);
+  if(c.tipo==='Mensual')periodos=Math.max(0,Math.floor((now-ini)/(30.44*86400000))+1);
+  else if(c.tipo==='Quincenal')periodos=Math.max(0,Math.floor((now-ini)/(15*86400000))+1);
   else periodos=Math.max(0,Math.floor((now-ini)/(7*86400000))+1);
   const esperado=periodos*c.monto;
   const pagado=db.pagos.filter(p=>p.contratoId===c.id).reduce((s,p)=>s+p.monto,0);
@@ -584,7 +599,7 @@ function porCobrarContrato(c){
 }
 
 function badge(t,c){return`<span class="badge ${c}">${t}</span>`;}
-function stBadge(e){return e==='Activo'||e==='Disponible'?badge(e,'gg'):e==='Rentada'?badge(e,'bg'):e==='Mantenimiento'||e==='Suspendido'?badge(e,'gy'):badge(e,'gx');}
+function stBadge(e){return e==='Activo'||e==='Disponible'?badge(e,'gg'):e==='Rentada'?badge(e,'bg'):e==='Vendida'?badge(e,'gp'):e==='Mantenimiento'||e==='Suspendido'?badge(e,'gy'):badge(e,'gx');}
 function toast(msg,type='s'){
   const w=document.getElementById('toastWrap'),t=document.createElement('div');
   t.className=`toast ${type}`;t.innerHTML=`<span>${type==='s'?'✓':type==='e'?'✕':'ℹ'}</span>${msg}`;
@@ -667,6 +682,7 @@ const PAGES=[
   {id:'contratos',icon:'📋',label:'Contratos'},
   {id:'lavadoras',icon:'🌀',label:'Inventario'},
   {id:'pagos',    icon:'💰',label:'Pagos'},
+  {id:'ventas',   icon:'🛒',label:'Ventas'},
   {id:'reportes', icon:'📊',label:'Reportes'},
   {id:'checklist',icon:'✅',label:'Verificación'},
 ];
@@ -687,6 +703,7 @@ function nuevoBtn(){
   else if(currentPage==='contratos')openFormContrato();
   else if(currentPage==='lavadoras')openFormLavadora();
   else if(currentPage==='pagos'){activePagoTab='registrar';renderPage();}
+  else if(currentPage==='ventas')openFormVenta();
   else if(currentPage==='checklist')generarChecklist();
   else openFormCliente();
 }
@@ -716,19 +733,12 @@ async function finalizarContrato(id){
 async function renovarContrato(id){
   const c=db.contratos.find(x=>x.id===id),cli=c?db.clientes.find(x=>x.id===c.clienteId):null;if(!c)return;
   confirmaAccion('🔄 Renovar contrato',
-    `<p style="margin-bottom:10px">¿Renovar el contrato <strong>#${c.id}</strong>${cli?` de <strong>${cli.nombre}</strong>`:''}?</p>
-     <div style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:12px 14px;margin-bottom:8px">
-       <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);display:block;margin-bottom:6px">Nueva fecha de inicio</label>
-       <input type="date" id="renovarFechaInput" value="${today()}" style="width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;color:var(--text);outline:none">
-     </div>
-     <p style="color:var(--muted);font-size:12px">El contrato se marcará como Activo con la fecha seleccionada.</p>`,
+    `<p style="margin-bottom:12px">¿Renovar el contrato <strong>#${c.id}</strong>${cli?` de <strong>${cli.nombre}</strong>`:''}?</p>
+     <p style="color:var(--muted);font-size:12px">Se marcará Activo y la fecha de inicio será hoy (${today()}).</p>`,
     'Renovar','btn-success',async()=>{
-      const fechaInput=document.getElementById('renovarFechaInput');
-      const nuevaFecha=fechaInput?fechaInput.value:today();
-      if(!nuevaFecha){toast('Selecciona una fecha de inicio','e');return;}
-      db.contratos=db.contratos.map(x=>x.id===id?{...x,estado:'Activo',inicio:nuevaFecha}:x);
+      db.contratos=db.contratos.map(x=>x.id===id?{...x,estado:'Activo',inicio:today()}:x);
       if(c.lavadoraId)db.lavadoras=db.lavadoras.map(l=>l.id===c.lavadoraId?{...l,estado:'Rentada'}:l);
-      await persist();renderPage();toast(`Contrato #${id} renovado desde ${nuevaFecha} ✓`);
+      await persist();renderPage();toast(`Contrato #${id} renovado ✓`);
     });
 }
 
@@ -736,7 +746,7 @@ async function renovarContrato(id){
 //  RENDER
 // ══════════════════════════════════════════════
 function renderPage(){
-  buildNav();
+  ensureDb();buildNav();
   const c=document.getElementById('pageContent');
   if(currentPage==='dashboard')c.innerHTML=renderDashboard();
   else if(currentPage==='clientes')c.innerHTML=renderClientes();
@@ -747,14 +757,15 @@ function renderPage(){
     if(window._pagoPresetId){const s=qs('#pContrato');if(s){s.value=window._pagoPresetId;updatePagoInfo();}}
   }
   else if(currentPage==='reportes')c.innerHTML=renderReportes();
+  else if(currentPage==='ventas')c.innerHTML=renderVentas();
   else if(currentPage==='checklist')c.innerHTML=renderChecklist();
 }
 
 // ── DASHBOARD ──────────────────────────────────
 function calcPendientes(){
-  const todayMzt=today();
+  const now=new Date();
   return db.contratos.filter(c=>c.estado==='Activo').map(c=>{
-    const prox=proximaFecha(c),diff=Math.ceil((new Date(prox)-new Date(todayMzt))/86400000);
+    const prox=proximaFecha(c),diff=Math.ceil((new Date(prox)-now)/86400000);
     const status=diff<0?'Vencido':diff<=3?'Por vencer':'Al corriente';
     return{...c,prox,diff,status};
   }).filter(c=>c.status!=='Al corriente');
@@ -763,7 +774,7 @@ function renderDashboard(){
   const now=new Date(),m=now.getMonth(),y=now.getFullYear();
   const cobrosMes=db.pagos.filter(p=>{const d=new Date(p.fecha);return d.getMonth()===m&&d.getFullYear()===y;}).reduce((s,p)=>s+p.monto,0);
   const activos=db.contratos.filter(c=>c.estado==='Activo');
-  const rentadas=db.contratos.filter(c=>c.estado==='Activo').length,totalLav=db.lavadoras.length;
+  const rentadas=db.lavadoras.filter(l=>l.estado==='Rentada').length,totalLav=db.lavadoras.filter(l=>l.estado!=='Vendida').length;
   const disp=db.lavadoras.filter(l=>l.estado==='Disponible').length,mant=db.lavadoras.filter(l=>l.estado==='Mantenimiento').length;
   const vencidos=calcPendientes().filter(v=>v.status==='Vencido').length;
   const activeCli=db.clientes.filter(c=>c.estado==='Activo').length;
@@ -774,10 +785,9 @@ function renderDashboard(){
   const ss=sortState['dashboard-contratos'];
   if(ss&&ss.key)activosSorted=sortData(activos,ss.key,ss.dir);
 
-  const todayMzt=today();
   const proxRows=activos.slice(0,5).map(c=>{
     const cli=db.clientes.find(x=>x.id===c.clienteId),prox=proximaFecha(c);
-    const diff=Math.ceil((new Date(prox)-new Date(todayMzt))/86400000);
+    const diff=Math.ceil((new Date(prox)-now)/86400000);
     const bc=diff<0?'gr':diff<=3?'gy':'gg',bl=diff<0?'Vencido':diff===0?'Hoy':`En ${diff}d`;
     return`<tr><td style="font-weight:600">${cli?cli.nombre:'—'}</td><td style="color:var(--accent2);font-weight:600">${fmtMXN(c.monto)}</td><td>${prox}</td><td>${badge(bl,bc)}</td></tr>`;
   }).join('');
@@ -790,7 +800,7 @@ function renderDashboard(){
   // #4 columnas pago inicial y por cobrar
   const contratosRows=activosSorted.length?activosSorted.map(c=>{
     const cli=db.clientes.find(x=>x.id===c.clienteId),lav=db.lavadoras.find(x=>x.id===c.lavadoraId);
-    const prox=proximaFecha(c),diff=Math.ceil((new Date(prox)-new Date(todayMzt))/86400000);
+    const prox=proximaFecha(c),diff=Math.ceil((new Date(prox)-now)/86400000);
     const bc=diff<0?'gr':diff<=3?'gy':'gg',bl=diff<0?'Vencido':diff===0?'Hoy':`En ${diff}d`;
     const pInicial=pagoInicialContrato(c),pCobrar=porCobrarContrato(c);
     return`<tr>
@@ -816,7 +826,7 @@ function renderDashboard(){
   return`
   <div class="page-heading"><span>⊞</span>Inicio</div>
   <div class="stat-grid">
-    <div class="stat-card"><div class="stat-label">Clientes activos</div><div class="stat-value">${activeCli}</div><div class="stat-sub">${db.clientes.filter(c=>c.estado==='Inactivo').length} inactivos · ${db.clientes.length} total</div><div class="stat-icon">👤</div></div>
+    <div class="stat-card"><div class="stat-label">Clientes activos</div><div class="stat-value">${activeCli}</div><div class="stat-sub">contratos vigentes</div><div class="stat-icon">👤</div></div>
     <div class="stat-card green"><div class="stat-label">Lavadoras rentadas</div><div class="stat-value">${rentadas}</div><div class="stat-sub">de ${totalLav} en inventario</div><div class="stat-icon">🌀</div></div>
     <div class="stat-card yellow"><div class="stat-label">Cobros este mes</div><div class="stat-value" style="font-size:22px">${fmtMXN(cobrosMes)}</div><div class="stat-sub">pagos recibidos</div><div class="stat-icon">💰</div></div>
     <div class="stat-card red"><div class="stat-label">Pagos vencidos</div><div class="stat-value">${vencidos}</div><div class="stat-sub">clientes con mora</div><div class="stat-icon">⚠️</div></div>
@@ -841,10 +851,9 @@ function renderDashboard(){
       ${thSort('dashboard-contratos','id','# Cont.')}
       ${thSort('dashboard-contratos','clienteId','ID Cli.')}
       <th>Cliente</th>
-      ${thSort('dashboard-contratos','lavadoraId','Lavadora')}
+      <th>Lavadora</th>
       ${thSort('dashboard-contratos','monto','Renta')}
       ${thSort('dashboard-contratos','tipo','Tipo')}
-      
       ${thSort('dashboard-contratos','inicio','Inicio')}
       <th>Próx. pago</th>
       <th>Pago inicial</th>
@@ -883,7 +892,7 @@ function renderClientes(){
   return`
   <div class="page-heading"><span>👤</span>Clientes</div>
   <div class="filters">
-    <input class="search-box" placeholder="🔍 Buscar nombre, tel, ID…" value="${window._searchCli||''}" oninput="window._searchCli=this.value;renderPage()" autocomplete="off">
+    <input class="search-box" placeholder="🔍 Buscar nombre, tel, ID…" value="${window._searchCli||''}" id="sb_searchCli" oninput="setSearch('_searchCli',this)" autocomplete="off">
     <select class="filter-select" onchange="window._filterCliEst=this.value;renderPage()">
       <option value="">Todos</option><option${est==='Activo'?' selected':''}>Activo</option><option${est==='Inactivo'?' selected':''}>Inactivo</option>
     </select>
@@ -959,12 +968,12 @@ function renderContratos(){
   const ssa=sortState['contratos-activos'];if(ssa&&ssa.key)activos=sortData(activos,ssa.key,ssa.dir);
   const ssf=sortState['contratos-final'];if(ssf&&ssf.key)finalizados=sortData(finalizados,ssf.key,ssf.dir);
 
-  const todayMztCt=today();
+  const now=new Date();
   const buildRow=(c,seccion)=>{
     const cli=db.clientes.find(x=>x.id===c.clienteId),lav=db.lavadoras.find(x=>x.id===c.lavadoraId);
     const bc=c.estado==='Activo'?'gg':c.estado==='Suspendido'?'gy':'gx';
     const prox=c.estado==='Activo'?proximaFecha(c):'—';
-    const diff=c.estado==='Activo'?Math.ceil((new Date(prox)-new Date(todayMztCt))/86400000):null;
+    const diff=c.estado==='Activo'?Math.ceil((new Date(prox)-now)/86400000):null;
     const pagoBadge=diff!==null?(diff<0?badge('Vencido','gr'):diff<=3?badge('Por vencer','gy'):badge('Al corriente','gg')):'';
     const pInicial=pagoInicialContrato(c),pCobrar=porCobrarContrato(c);
     return`<tr>
@@ -990,7 +999,7 @@ function renderContratos(){
   const headRow=(seccion)=>`<tr>
     ${thSort(seccion,'id','#')}
     ${thSort(seccion,'clienteId','ID Cli.')}
-    <th>Cliente</th>${thSort(seccion,'lavadoraId','Lavadora')}
+    <th>Cliente</th><th>Lavadora</th>
     ${thSort(seccion,'monto','Renta')}
     ${thSort(seccion,'tipo','Tipo')}
     ${thSort(seccion,'estado','Estado')}
@@ -1003,7 +1012,7 @@ function renderContratos(){
   return`
   <div class="page-heading"><span>📋</span>Contratos de renta</div>
   <div class="filters">
-    <input class="search-box" placeholder="🔍 Buscar cliente o # contrato…" value="${window._searchCt||''}" oninput="window._searchCt=this.value;renderPage()" autocomplete="off">
+    <input class="search-box" placeholder="🔍 Buscar cliente o # contrato…" value="${window._searchCt||''}" id="sb_searchCt" oninput="setSearch('_searchCt',this)" autocomplete="off">
     <select class="filter-select" onchange="window._filterCtTipo=this.value;renderPage()">
       <option value="">Tipo pago</option><option${tipo==='Mensual'?' selected':''}>Mensual</option><option${tipo==='Quincenal'?' selected':''}>Quincenal</option><option${tipo==='Semanal'?' selected':''}>Semanal</option>
     </select>
@@ -1033,19 +1042,9 @@ function onCtClienteChange(){
 function openFormContrato(c){
   document.getElementById('ctId').value=c?c.id:'';
   document.getElementById('ctCliente').innerHTML=db.clientes.map(x=>`<option value="${x.id}"${c&&c.clienteId===x.id?' selected':''}>🔹 #${x.id} — ${x.nombre}</option>`).join('');
-  // Solo mostrar Disponibles + la actual del contrato (si se está editando)
-  const lavOptions=db.lavadoras.filter(x=>{
-    const tieneContratoActivo=db.contratos.some(ct=>ct.lavadoraId===x.id&&ct.estado==='Activo'&&(!c||ct.id!==c.id));
-    if(tieneContratoActivo) return false; // Rentada por otro contrato activo
-    if(x.estado==='Mantenimiento'&&(!c||c.lavadoraId!==x.id)) return false; // En mantenimiento
-    return true;
-  }).map(x=>{
-    const estadoReal=db.contratos.some(ct=>ct.lavadoraId===x.id&&ct.estado==='Activo')?'Rentada':x.estado;
-    return`<option value="${x.id}"${c&&c.lavadoraId===x.id?' selected':''}>${x.num} · ${x.marca} (${estadoReal})</option>`;
-  }).join('');
-  document.getElementById('ctLavadora').innerHTML=lavOptions||'<option value="">— Sin lavadoras disponibles —</option>';
+  document.getElementById('ctLavadora').innerHTML=db.lavadoras.filter(x=>x.estado!=='Vendida'||(c&&c.lavadoraId===x.id)).map(x=>`<option value="${x.id}"${c&&c.lavadoraId===x.id?' selected':''}>${x.num} · ${x.marca} (${x.estado})</option>`).join('');
   document.getElementById('ctInicio').value=c?c.inicio:today();
-  document.getElementById('ctTipo').value=c?c.tipo:'Semanal';
+  document.getElementById('ctTipo').value=c?c.tipo:'Mensual';
   document.getElementById('ctMonto').value=c?c.monto:'';
   document.getElementById('ctEstado').value=c?c.estado:'Activo';
   document.getElementById('ctDir').value=c?c.dir:'';
@@ -1065,11 +1064,6 @@ async function guardarContrato(){
   const id=document.getElementById('ctId').value;
   const cliId=Number(document.getElementById('ctCliente').value),lavId=Number(document.getElementById('ctLavadora').value),monto=document.getElementById('ctMonto').value;
   if(!cliId||!lavId||!monto){toast('Completa los campos obligatorios','e');return;}
-  // Validar que la lavadora esté disponible (no rentada por otro contrato activo ni en mantenimiento)
-  const lavSel=db.lavadoras.find(l=>l.id===lavId);
-  const contratoActivoLav=db.contratos.find(ct=>ct.lavadoraId===lavId&&ct.estado==='Activo'&&(!id||ct.id!==Number(id)));
-  if(contratoActivoLav){toast('Esa lavadora ya tiene un contrato activo (#'+contratoActivoLav.id+')','e');return;}
-  if(lavSel&&lavSel.estado==='Mantenimiento'&&(!id||db.contratos.find(ct=>ct.id===Number(id))?.lavadoraId!==lavId)){toast('Esa lavadora está en Mantenimiento y no puede rentarse','e');return;}
   const data={clienteId:cliId,lavadoraId:lavId,monto:Number(monto),inicio:document.getElementById('ctInicio').value,tipo:document.getElementById('ctTipo').value,estado:document.getElementById('ctEstado').value,dir:document.getElementById('ctDir').value,notas:document.getElementById('ctNotas').value};
   let newId;
   if(id){db.contratos=db.contratos.map(c=>c.id==id?{...c,...data}:c);toast('Contrato actualizado');newId=Number(id);}
@@ -1111,17 +1105,14 @@ function renderLavadoras(){
   const rows=data.map(l=>{
     const cont=db.contratos.find(c=>c.lavadoraId===l.id&&c.estado==='Activo');
     const cli=cont?db.clientes.find(c=>c.id===cont.clienteId):null;
-    // Estado derivado automáticamente: si tiene contrato activo = Rentada, si no mantiene su estado manual
-    const estadoReal=cont?'Rentada':l.estado;
     return`<tr>
       <td style="font-weight:700;color:var(--accent)">${l.num}</td>
       <td>${l.marca}</td>
       <td>${l.modelo||'—'}</td>
       <td>${l.cap?l.cap+' kg':'—'}</td>
       <td>${l.anio||'—'}</td>
-      <td>${stBadge(estadoReal)}</td>
-      <td style="color:var(--muted)">${cli?`#${cli.id}`:'—'}</td>
-      <td style="font-weight:600">${cli?cli.nombre:'—'}</td>
+      <td>${stBadge(l.estado)}</td>
+      <td style="color:var(--muted)">${cli?`#${cli.id} · ${cli.nombre}`:'—'}</td>
       <td>
         <button class="action-btn" onclick="verLavadora(${l.id})">👁</button>
         <button class="action-btn" onclick="editLavadora(${l.id})">✏️</button>
@@ -1132,9 +1123,9 @@ function renderLavadoras(){
   return`
   <div class="page-heading"><span>🌀</span>Inventario de lavadoras</div>
   <div class="filters">
-    <input class="search-box" placeholder="🔍 Buscar ID, marca, modelo…" value="${window._searchLav||''}" oninput="window._searchLav=this.value;renderPage()" autocomplete="off">
+    <input class="search-box" placeholder="🔍 Buscar ID, marca, modelo…" value="${window._searchLav||''}" id="sb_searchLav" oninput="setSearch('_searchLav',this)" autocomplete="off">
     <select class="filter-select" onchange="window._filterLavEst=this.value;renderPage()">
-      <option value="">Todos</option><option${est==='Disponible'?' selected':''}>Disponible</option><option${est==='Rentada'?' selected':''}>Rentada</option><option${est==='Mantenimiento'?' selected':''}>Mantenimiento</option>
+      <option value="">Todos</option><option${est==='Disponible'?' selected':''}>Disponible</option><option${est==='Rentada'?' selected':''}>Rentada</option><option${est==='Mantenimiento'?' selected':''}>Mantenimiento</option><option${est==='Vendida'?' selected':''}>Vendida</option>
     </select>
     <button class="btn btn-primary btn-sm" onclick="openFormLavadora()">+ Nueva lavadora</button>
   </div>
@@ -1147,7 +1138,7 @@ function renderLavadoras(){
       ${thSort('lavadoras','cap','Capacidad')}
       ${thSort('lavadoras','anio','Año')}
       ${thSort('lavadoras','estado','Estado')}
-      <th>ID Cli.</th><th>Cliente</th><th></th>
+      <th>ID · Cliente</th><th></th>
     </tr></thead><tbody>${rows||'<tr><td colspan="8"><div class="empty"><div class="empty-icon">🌀</div><p>Sin lavadoras</p></div></td></tr>'}</tbody></table></div>
   </div>`;
 }
@@ -1240,7 +1231,7 @@ function renderPagos(){
     }).join('');
     return`<div class="page-heading"><span>💰</span>Pagos</div>${tabs}
     <div class="filters">
-      <input class="search-box" placeholder="🔍 Buscar cliente o período…" value="${window._searchPago||''}" oninput="window._searchPago=this.value;renderPage()" autocomplete="off">
+      <input class="search-box" placeholder="🔍 Buscar cliente o período…" value="${window._searchPago||''}" id="sb_searchPago" oninput="setSearch('_searchPago',this)" autocomplete="off">
       <select class="filter-select" onchange="window._filterPagoMet=this.value;renderPage()">
         <option value="">Todos los métodos</option><option${met==='Efectivo'?' selected':''}>Efectivo</option><option${met==='Transferencia'?' selected':''}>Transferencia</option><option${met==='Tarjeta'?' selected':''}>Tarjeta</option>
       </select>
@@ -1301,6 +1292,10 @@ async function registrarPago(){
   db.pagos.push({id:nextId(db.pagos),contratoId:id,monto:Number(monto),fecha,metodo:qs('#pMetodo').value,periodo:qs('#pPeriodo').value,notas:qs('#pNotas').value});
   await persist();toast('Pago registrado ✓');limpiarPago();renderPage();
 }
+function setSearch(key,el){
+  window[key]=el.value;const pos=el.selectionStart,id=el.id;renderPage();
+  const n=document.getElementById(id);if(n){n.focus();try{n.setSelectionRange(pos,pos);}catch(e){}}
+}
 function limpiarPago(){window._pagoPresetId=null;renderPage();}
 async function delPago(id){
   if(!confirm('¿Eliminar pago?'))return;
@@ -1311,7 +1306,7 @@ async function delPago(id){
 function renderReportes(){
   const total=db.pagos.reduce((s,p)=>s+p.monto,0);
   const activos=db.contratos.filter(c=>c.estado==='Activo');
-  const rentadas=db.contratos.filter(c=>c.estado==='Activo').length,totalLav=db.lavadoras.length;
+  const rentadas=db.lavadoras.filter(l=>l.estado==='Rentada').length,totalLav=db.lavadoras.filter(l=>l.estado!=='Vendida').length;
   const prom=activos.length?activos.reduce((s,c)=>s+c.monto,0)/activos.length:0;
   const venc=calcPendientes().filter(v=>v.status==='Vencido').length;
   const mora=activos.length?Math.round(venc/activos.length*100):0;
@@ -1341,6 +1336,116 @@ function renderReportes(){
 }
 
 // ── CHECKLIST (#8) ──────────────────────────────
+// ── VENTAS ──────────────────────────────────────
+function ventaComprador(v){
+  const cli=v.clienteId?db.clientes.find(x=>x.id===v.clienteId):null;
+  return cli?cli.nombre:(v.comprador||'Público general');
+}
+function renderVentas(){
+  const q=(window._searchVen||'').toLowerCase(),met=window._filterVenMet||'',now=new Date();
+  const all=db.ventas.map(v=>{
+    const l=db.lavadoras.find(x=>x.id===v.lavadoraId);
+    return{...v,compradorTxt:ventaComprador(v),lavNum:l?l.num:'—',lavDesc:l?((l.marca||'')+' '+(l.modelo||'')).trim():'—'};
+  });
+  let data=all.filter(v=>(!q||v.compradorTxt.toLowerCase().includes(q)||v.lavNum.toLowerCase().includes(q)||v.lavDesc.toLowerCase().includes(q)||String(v.id).includes(q))&&(!met||v.metodo===met));
+  const ss=sortState['ventas'];
+  data=(ss&&ss.key)?sortData(data,ss.key,ss.dir):[...data].reverse();
+  const totalIng=all.reduce((s,v)=>s+v.precio,0);
+  const delMes=all.filter(v=>{const d=new Date(v.fecha+'T00:00:00');return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();});
+  const ingMes=delMes.reduce((s,v)=>s+v.precio,0);
+  const disp=db.lavadoras.filter(l=>l.estado==='Disponible').length;
+  const rows=data.map(v=>`<tr>
+      <td style="color:var(--muted);font-weight:700">#${v.id}</td>
+      <td>${v.fecha}</td>
+      <td style="font-weight:700;color:var(--accent)">${v.lavNum} <span style="color:var(--muted);font-weight:400">· ${v.lavDesc}</span></td>
+      <td>${v.clienteId?`<span style="color:var(--muted)">#${v.clienteId}</span> `:''}<b>${v.compradorTxt}</b></td>
+      <td style="color:var(--accent2);font-weight:600">${fmtMXN(v.precio)}</td>
+      <td>${badge(v.metodo||'—','gx')}</td>
+      <td>
+        <button class="action-btn" title="Ver" onclick="verVenta(${v.id})">👁</button>
+        <button class="action-btn" title="Editar" onclick="editVenta(${v.id})">✏️</button>
+        <button class="action-btn" title="Eliminar" onclick="delVenta(${v.id})">🗑</button>
+      </td>
+    </tr>`).join('');
+  return`
+  <div class="page-heading"><span>🛒</span>Ventas</div>
+  <div class="stat-grid">
+    <div class="stat-card"><div class="stat-label">Lavadoras vendidas</div><div class="stat-value">${all.length}</div><div class="stat-sub">acumulado</div><div class="stat-icon">🛒</div></div>
+    <div class="stat-card green"><div class="stat-label">Ingresos por ventas</div><div class="stat-value" style="font-size:22px">${fmtMXN(totalIng)}</div><div class="stat-sub">acumulado</div><div class="stat-icon">💵</div></div>
+    <div class="stat-card yellow"><div class="stat-label">Ventas este mes</div><div class="stat-value">${delMes.length}</div><div class="stat-sub">${fmtMXN(ingMes)}</div><div class="stat-icon">📅</div></div>
+    <div class="stat-card red"><div class="stat-label">Disponibles para venta</div><div class="stat-value">${disp}</div><div class="stat-sub">en inventario</div><div class="stat-icon">🌀</div></div>
+  </div>
+  <div class="filters">
+    <input class="search-box" id="sb_searchVen" placeholder="🔍 Buscar comprador, lavadora, #…" value="${window._searchVen||''}" oninput="setSearch('_searchVen',this)" autocomplete="off">
+    <select class="filter-select" onchange="window._filterVenMet=this.value;renderPage()">
+      <option value="">Todos los métodos</option><option${met==='Efectivo'?' selected':''}>Efectivo</option><option${met==='Transferencia'?' selected':''}>Transferencia</option><option${met==='Tarjeta'?' selected':''}>Tarjeta</option>
+    </select>
+    <button class="btn btn-primary btn-sm" onclick="openFormVenta()">+ Nueva venta</button>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">Lavadoras vendidas</div>${badge(data.length,'bg')}</div>
+    <div class="table-wrap"><table><thead><tr>
+      ${thSort('ventas','id','#')}
+      ${thSort('ventas','fecha','Fecha')}
+      ${thSort('ventas','lavNum','Lavadora')}
+      ${thSort('ventas','compradorTxt','Comprador')}
+      ${thSort('ventas','precio','Precio')}
+      ${thSort('ventas','metodo','Método')}
+      <th></th>
+    </tr></thead><tbody>${rows||'<tr><td colspan="7"><div class="empty"><div class="empty-icon">🛒</div><p>Sin ventas registradas</p></div></td></tr>'}</tbody></table></div>
+  </div>`;
+}
+function onVentaClienteChange(){
+  document.getElementById('vNombreWrap').style.display=document.getElementById('vCliente').value?'none':'flex';
+}
+function openFormVenta(v){
+  const libres=db.lavadoras.filter(l=>l.estado==='Disponible'||(v&&v.lavadoraId===l.id));
+  if(!libres.length){toast('No hay lavadoras disponibles para vender','e');return;}
+  document.getElementById('vId').value=v?v.id:'';
+  document.getElementById('vLavadora').innerHTML=libres.map(l=>`<option value="${l.id}"${v&&v.lavadoraId===l.id?' selected':''}>${l.num} · ${l.marca} ${l.modelo||''}${l.cap?' ('+l.cap+' kg)':''}</option>`).join('');
+  document.getElementById('vCliente').innerHTML='<option value="">— Sin registrar (público general) —</option>'+db.clientes.map(x=>`<option value="${x.id}"${v&&v.clienteId===x.id?' selected':''}>🔹 #${x.id} — ${x.nombre}</option>`).join('');
+  document.getElementById('vNombre').value=v?(v.comprador||''):'';
+  document.getElementById('vFecha').value=v?v.fecha:today();
+  document.getElementById('vPrecio').value=v?v.precio:'';
+  document.getElementById('vMetodo').value=v?(v.metodo||'Efectivo'):'Efectivo';
+  document.getElementById('vNotas').value=v?(v.notas||''):'';
+  document.getElementById('mVenTitle').textContent=v?'Editar venta':'Nueva venta';
+  onVentaClienteChange();
+  openModal('modal-venta');
+}
+function editVenta(id){openFormVenta(db.ventas.find(v=>v.id===id));}
+async function guardarVenta(){
+  const id=document.getElementById('vId').value;
+  const lavId=Number(document.getElementById('vLavadora').value),precio=Number(document.getElementById('vPrecio').value),fecha=document.getElementById('vFecha').value;
+  if(!lavId||!precio||!fecha){toast('Completa los campos obligatorios','e');return;}
+  const cliVal=document.getElementById('vCliente').value;
+  const data={lavadoraId:lavId,clienteId:cliVal?Number(cliVal):null,comprador:cliVal?'':document.getElementById('vNombre').value.trim(),fecha,precio,metodo:document.getElementById('vMetodo').value,notas:document.getElementById('vNotas').value};
+  if(id){
+    const old=db.ventas.find(v=>v.id==id);
+    if(old&&old.lavadoraId!==lavId)db.lavadoras=db.lavadoras.map(l=>l.id===old.lavadoraId?{...l,estado:'Disponible'}:l);
+    db.ventas=db.ventas.map(v=>v.id==id?{...v,...data}:v);toast('Venta actualizada');
+  }else{
+    db.ventas.push({id:nextId(db.ventas),...data});toast('Venta registrada ✓');
+  }
+  db.lavadoras=db.lavadoras.map(l=>l.id===lavId?{...l,estado:'Vendida'}:l);
+  closeModal('modal-venta');await persist();renderPage();
+}
+async function delVenta(id){
+  if(!confirm('¿Eliminar esta venta? La lavadora volverá a quedar Disponible.'))return;
+  const v=db.ventas.find(x=>x.id===id);
+  db.ventas=db.ventas.filter(x=>x.id!==id);
+  if(v)db.lavadoras=db.lavadoras.map(l=>l.id===v.lavadoraId?{...l,estado:'Disponible'}:l);
+  await persist();renderPage();toast('Venta eliminada','i');
+}
+function verVenta(id){
+  const v=db.ventas.find(x=>x.id===id);if(!v)return;
+  const l=db.lavadoras.find(x=>x.id===v.lavadoraId);
+  document.getElementById('mDetTitle').textContent=`Venta #${v.id}`;
+  document.getElementById('mDetBody').innerHTML=[['Lavadora',l?`${l.num} · ${l.marca} ${l.modelo||''}`:'—'],['Capacidad',l&&l.cap?l.cap+' kg':'—'],['Comprador',(v.clienteId?'#'+v.clienteId+' · ':'')+ventaComprador(v)],['Fecha',v.fecha],['Precio',fmtMXN(v.precio)],['Método',v.metodo||'—'],['Notas',v.notas||'—']].map(([k,x])=>`<div class="detail-row"><span class="dk">${k}</span><span class="dv">${x}</span></div>`).join('');
+  document.getElementById('mDetFoot').innerHTML=`<button class="btn btn-secondary" onclick="closeModal('modal-detalle')">Cerrar</button><button class="btn btn-primary" onclick="closeModal('modal-detalle');editVenta(${id})">✏️ Editar</button>`;
+  openModal('modal-detalle');
+}
+
 let checklistItems=[];
 let checklistType='ambos';
 
@@ -1349,7 +1454,7 @@ function generarChecklist(){
   const tipo=checklistType;
 
   if(tipo==='lavadoras'||tipo==='ambos'){
-    db.lavadoras.forEach(l=>{
+    db.lavadoras.filter(l=>l.estado!=='Vendida').forEach(l=>{
       const cont=db.contratos.find(c=>c.lavadoraId===l.id&&c.estado==='Activo');
       const cli=cont?db.clientes.find(c=>c.id===cont.clienteId):null;
       checklistItems.push({
@@ -1363,7 +1468,7 @@ function generarChecklist(){
   if(tipo==='contratos'||tipo==='ambos'){
     db.contratos.filter(c=>c.estado==='Activo').forEach(c=>{
       const cli=db.clientes.find(x=>x.id===c.clienteId),lav=db.lavadoras.find(x=>x.id===c.lavadoraId);
-      const prox=proximaFecha(c),diff=Math.ceil((new Date(prox)-new Date(today()))/86400000);
+      const prox=proximaFecha(c),diff=Math.ceil((new Date(prox)-new Date())/86400000);
       checklistItems.push({
         id:'ct-'+c.id,done:false,
         label:`Contrato #${c.id} — ${cli?cli.nombre:'—'} (${lav?lav.num:'—'})`,
