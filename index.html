@@ -217,6 +217,29 @@ tr:hover td{background:#F7F9FF}
   .stat-value{font-size:22px}
   .page-heading{font-size:18px}
 }
+
+/* ── NOTA DE COMPRA-VENTA ── */
+#notaPrint{display:none}
+.nota{background:#fff;color:#111;font-family:'Segoe UI',Arial,sans-serif;font-size:13px;padding:22px;border:1px solid var(--border);border-radius:10px;line-height:1.5}
+.nota-head{display:flex;justify-content:space-between;gap:16px;border-bottom:2px solid #111;padding-bottom:12px;margin-bottom:14px}
+.nota-biz{font-size:20px;font-weight:800}
+.nota-sub{font-size:11px;color:#555;margin-top:2px}
+.nota-title{font-size:15px;font-weight:800;letter-spacing:.04em}
+.nota-tbl{width:100%;min-width:0;border-collapse:collapse;margin-bottom:12px}
+.nota-tbl td{padding:6px 4px;border-bottom:1px solid #ddd;font-size:13px;background:none!important}
+.nota-tbl td:first-child{width:34%;color:#555;font-size:11px;text-transform:uppercase;letter-spacing:.05em;font-weight:700}
+.nota-total{display:flex;justify-content:space-between;align-items:center;border:2px solid #111;border-radius:8px;padding:10px 14px;font-size:16px;margin-top:6px}
+.nota-total b{font-size:20px}
+.nota-letra{font-size:12px;margin:6px 2px 12px;font-style:italic}
+.nota-clausula{font-size:11px;color:#444;margin-bottom:34px}
+.nota-firmas{display:flex;gap:40px;text-align:center;font-size:12px}
+.nota-firmas div{flex:1;border-top:1px solid #111;padding-top:6px}
+@media print{
+  @page{margin:14mm}
+  body.print-nota>*{display:none!important}
+  body.print-nota>#notaPrint{display:block!important}
+  body.print-nota .nota{border:none;padding:0}
+}
 </style>
 </head>
 <body>
@@ -296,6 +319,7 @@ tr:hover td{background:#F7F9FF}
   </div>
 </div>
 
+<div id="notaPrint"></div>
 <div class="toast-wrap" id="toastWrap"></div>
 
 <!-- ══ MODALS ══ -->
@@ -414,6 +438,14 @@ tr:hover td{background:#F7F9FF}
       </div>
     </div>
     <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('modal-venta')">Cancelar</button><button class="btn btn-primary" onclick="guardarVenta()">Guardar</button></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal-nota">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header"><div class="modal-title">🧾 Nota de compra-venta</div><button class="modal-close" onclick="closeModal('modal-nota')">×</button></div>
+    <div class="modal-body" id="notaPreview"></div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('modal-nota')">Cerrar</button><button class="btn btn-primary" onclick="imprimirNota()">🖨 Imprimir / Guardar PDF</button></div>
   </div>
 </div>
 
@@ -1363,6 +1395,7 @@ function renderVentas(){
       <td>${badge(v.metodo||'—','gx')}</td>
       <td>
         <button class="action-btn" title="Ver" onclick="verVenta(${v.id})">👁</button>
+        <button class="action-btn" title="Comprobante" onclick="abrirNota(${v.id})">🧾</button>
         <button class="action-btn" title="Editar" onclick="editVenta(${v.id})">✏️</button>
         <button class="action-btn" title="Eliminar" onclick="delVenta(${v.id})">🗑</button>
       </td>
@@ -1432,12 +1465,70 @@ async function delVenta(id){
   if(v)db.lavadoras=db.lavadoras.map(l=>l.id===v.lavadoraId?{...l,estado:'Disponible'}:l);
   await persist();renderPage();toast('Venta eliminada','i');
 }
+// ── NOTA DE COMPRA-VENTA ────────────────────────
+// Completa estos datos para que aparezcan en el encabezado de la nota
+const NEGOCIO={nombre:'Lavadoras Sur 16',dir:'',tel:''};
+const esc=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function numALetras(n){
+  const U=['','uno','dos','tres','cuatro','cinco','seis','siete','ocho','nueve','diez','once','doce','trece','catorce','quince','dieciséis','diecisiete','dieciocho','diecinueve','veinte','veintiuno','veintidós','veintitrés','veinticuatro','veinticinco','veintiséis','veintisiete','veintiocho','veintinueve'];
+  const D=['','','','treinta','cuarenta','cincuenta','sesenta','setenta','ochenta','noventa'];
+  const C=['','ciento','doscientos','trescientos','cuatrocientos','quinientos','seiscientos','setecientos','ochocientos','novecientos'];
+  const b100=x=>x<30?U[x]:D[Math.floor(x/10)]+(x%10?' y '+U[x%10]:'');
+  const b1000=x=>x===100?'cien':(C[Math.floor(x/100)]+' '+(x%100?b100(x%100):'')).trim();
+  const miles=x=>{if(x<1000)return b1000(x);const m=Math.floor(x/1000),r=x%1000;return (m===1?'mil':b1000(m)+' mil')+(r?' '+b1000(r):'');};
+  const e=Math.floor(n);if(e===0)return 'cero';
+  let out;
+  if(e>=1000000){const mi=Math.floor(e/1000000),r=e%1000000;out=(mi===1?'un millón':miles(mi)+' millones')+(r?' '+miles(r):'');}
+  else out=miles(e);
+  return out.replace(/veintiuno(?= mil| millones|$)/g,'veintiún').replace(/uno(?= mil| millones|$)/g,'un');
+}
+function notaVenta(v){
+  const l=db.lavadoras.find(x=>x.id===v.lavadoraId),cli=v.clienteId?db.clientes.find(x=>x.id===v.clienteId):null;
+  const desc=v.descripcion||(l?((l.marca||'')+' '+(l.modelo||'')).trim():'—');
+  const folio='V-'+String(v.id).padStart(4,'0');
+  const [yy,mm,dd]=String(v.fecha).split('-');
+  const total=Number(v.precio)||0,ent=Math.floor(total),cts=String(Math.round((total-ent)*100)).padStart(2,'0');
+  const letra=numALetras(total);
+  const letraTxt=letra.charAt(0).toUpperCase()+letra.slice(1)+(ent===1?' peso ':' pesos ')+cts+'/100 M.N.';
+  const fila=(k,x)=>x?`<tr><td>${k}</td><td>${esc(x)}</td></tr>`:'';
+  return`<div class="nota">
+    <div class="nota-head">
+      <div><div class="nota-biz">🌀 ${esc(NEGOCIO.nombre)}</div><div class="nota-sub">${[NEGOCIO.dir,NEGOCIO.tel&&'Tel. '+NEGOCIO.tel].filter(Boolean).map(esc).join(' · ')}</div></div>
+      <div style="text-align:right"><div class="nota-title">NOTA DE COMPRA-VENTA</div><div>Folio: <b>${folio}</b></div><div>Fecha: ${dd}/${mm}/${yy}</div></div>
+    </div>
+    <table class="nota-tbl"><tbody>
+      ${fila('Comprador',ventaComprador(v))}
+      ${fila('Teléfono',cli&&cli.tel)}
+      ${fila('Domicilio',cli&&cli.dir)}
+      ${fila('Artículo',desc)}
+      ${fila('Método de pago',v.metodo)}
+      ${fila('Observaciones',v.notas)}
+    </tbody></table>
+    <div class="nota-total"><span>TOTAL PAGADO</span><b>$${total.toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2})}</b></div>
+    <div class="nota-letra">(${esc(letraTxt)})</div>
+    <p class="nota-clausula">El vendedor entrega al comprador el artículo descrito y el comprador lo recibe de conformidad, habiendo cubierto el importe total indicado en esta nota.</p>
+    <div class="nota-firmas"><div>Vendedor<br>${esc(NEGOCIO.nombre)}</div><div>Comprador<br>${esc(ventaComprador(v))}</div></div>
+  </div>`;
+}
+function abrirNota(id){
+  const v=db.ventas.find(x=>x.id===id);if(!v)return;
+  const html=notaVenta(v);
+  document.getElementById('notaPreview').innerHTML=html;
+  document.getElementById('notaPrint').innerHTML=html;
+  openModal('modal-nota');
+}
+function imprimirNota(){
+  document.body.classList.add('print-nota');
+  const done=()=>{document.body.classList.remove('print-nota');window.removeEventListener('afterprint',done);};
+  window.addEventListener('afterprint',done);
+  window.print();setTimeout(done,1500);
+}
 function verVenta(id){
   const v=db.ventas.find(x=>x.id===id);if(!v)return;
   const l=db.lavadoras.find(x=>x.id===v.lavadoraId);
   document.getElementById('mDetTitle').textContent=`Venta #${v.id}`;
   document.getElementById('mDetBody').innerHTML=[['Lavadora',v.descripcion||(l?`${l.num} · ${l.marca} ${l.modelo||''}`:'—')],['Comprador',(v.clienteId?'#'+v.clienteId+' · ':'')+ventaComprador(v)],['Fecha',v.fecha],['Precio',fmtMXN(v.precio)],['Método',v.metodo||'—'],['Notas',v.notas||'—']].map(([k,x])=>`<div class="detail-row"><span class="dk">${k}</span><span class="dv">${x}</span></div>`).join('');
-  document.getElementById('mDetFoot').innerHTML=`<button class="btn btn-secondary" onclick="closeModal('modal-detalle')">Cerrar</button><button class="btn btn-primary" onclick="closeModal('modal-detalle');editVenta(${id})">✏️ Editar</button>`;
+  document.getElementById('mDetFoot').innerHTML=`<button class="btn btn-secondary" onclick="closeModal('modal-detalle')">Cerrar</button><button class="btn btn-success" onclick="closeModal('modal-detalle');abrirNota(${id})">🧾 Comprobante</button><button class="btn btn-primary" onclick="closeModal('modal-detalle');editVenta(${id})">✏️ Editar</button>`;
   openModal('modal-detalle');
 }
 
