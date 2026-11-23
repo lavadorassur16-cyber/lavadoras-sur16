@@ -404,7 +404,7 @@ tr:hover td{background:#F7F9FF}
     <div class="modal-body">
       <div class="form-grid">
         <input type="hidden" id="vId">
-        <div class="form-group full"><label class="form-label">Lavadora * (solo disponibles)</label><select class="form-select" id="vLavadora"></select></div>
+        <div class="form-group full"><label class="form-label">Lavadora vendida (marca / modelo) *</label><input class="form-input" id="vDesc" placeholder="Ej: Kenmore 18 kg"></div>
         <div class="form-group full"><label class="form-label">Cliente comprador</label><select class="form-select" id="vCliente" onchange="onVentaClienteChange()"></select></div>
         <div class="form-group full" id="vNombreWrap"><label class="form-label">Nombre del comprador</label><input class="form-input" id="vNombre" placeholder="Si no está registrado como cliente"></div>
         <div class="form-group"><label class="form-label">Fecha de venta *</label><input class="form-input" type="date" id="vFecha"></div>
@@ -1345,7 +1345,7 @@ function renderVentas(){
   const q=(window._searchVen||'').toLowerCase(),met=window._filterVenMet||'',now=new Date();
   const all=db.ventas.map(v=>{
     const l=db.lavadoras.find(x=>x.id===v.lavadoraId);
-    return{...v,compradorTxt:ventaComprador(v),lavNum:l?l.num:'—',lavDesc:l?((l.marca||'')+' '+(l.modelo||'')).trim():'—'};
+    return{...v,compradorTxt:ventaComprador(v),lavNum:l?l.num:'',lavDesc:v.descripcion||(l?((l.marca||'')+' '+(l.modelo||'')).trim():'—')};
   });
   let data=all.filter(v=>(!q||v.compradorTxt.toLowerCase().includes(q)||v.lavNum.toLowerCase().includes(q)||v.lavDesc.toLowerCase().includes(q)||String(v.id).includes(q))&&(!met||v.metodo===met));
   const ss=sortState['ventas'];
@@ -1357,7 +1357,7 @@ function renderVentas(){
   const rows=data.map(v=>`<tr>
       <td style="color:var(--muted);font-weight:700">#${v.id}</td>
       <td>${v.fecha}</td>
-      <td style="font-weight:700;color:var(--accent)">${v.lavNum} <span style="color:var(--muted);font-weight:400">· ${v.lavDesc}</span></td>
+      <td style="font-weight:600">${v.lavNum?`<span style="color:var(--accent);font-weight:700">${v.lavNum}</span> · `:''}${v.lavDesc}</td>
       <td>${v.clienteId?`<span style="color:var(--muted)">#${v.clienteId}</span> `:''}<b>${v.compradorTxt}</b></td>
       <td style="color:var(--accent2);font-weight:600">${fmtMXN(v.precio)}</td>
       <td>${badge(v.metodo||'—','gx')}</td>
@@ -1387,7 +1387,7 @@ function renderVentas(){
     <div class="table-wrap"><table><thead><tr>
       ${thSort('ventas','id','#')}
       ${thSort('ventas','fecha','Fecha')}
-      ${thSort('ventas','lavNum','Lavadora')}
+      ${thSort('ventas','lavDesc','Lavadora')}
       ${thSort('ventas','compradorTxt','Comprador')}
       ${thSort('ventas','precio','Precio')}
       ${thSort('ventas','metodo','Método')}
@@ -1399,10 +1399,8 @@ function onVentaClienteChange(){
   document.getElementById('vNombreWrap').style.display=document.getElementById('vCliente').value?'none':'flex';
 }
 function openFormVenta(v){
-  const libres=db.lavadoras.filter(l=>l.estado==='Disponible'||(v&&v.lavadoraId===l.id));
-  if(!libres.length){toast('No hay lavadoras disponibles para vender','e');return;}
   document.getElementById('vId').value=v?v.id:'';
-  document.getElementById('vLavadora').innerHTML=libres.map(l=>`<option value="${l.id}"${v&&v.lavadoraId===l.id?' selected':''}>${l.num} · ${l.marca} ${l.modelo||''}${l.cap?' ('+l.cap+' kg)':''}</option>`).join('');
+  document.getElementById('vDesc').value=(()=>{const l=v&&db.lavadoras.find(x=>x.id===v.lavadoraId);return v?(v.descripcion||(l?((l.marca||'')+' '+(l.modelo||'')).trim():'')):'';})();
   document.getElementById('vCliente').innerHTML='<option value="">— Sin registrar (público general) —</option>'+db.clientes.map(x=>`<option value="${x.id}"${v&&v.clienteId===x.id?' selected':''}>🔹 #${x.id} — ${x.nombre}</option>`).join('');
   document.getElementById('vNombre').value=v?(v.comprador||''):'';
   document.getElementById('vFecha').value=v?v.fecha:today();
@@ -1416,18 +1414,15 @@ function openFormVenta(v){
 function editVenta(id){openFormVenta(db.ventas.find(v=>v.id===id));}
 async function guardarVenta(){
   const id=document.getElementById('vId').value;
-  const lavId=Number(document.getElementById('vLavadora').value),precio=Number(document.getElementById('vPrecio').value),fecha=document.getElementById('vFecha').value;
-  if(!lavId||!precio||!fecha){toast('Completa los campos obligatorios','e');return;}
+  const desc=document.getElementById('vDesc').value.trim(),precio=Number(document.getElementById('vPrecio').value),fecha=document.getElementById('vFecha').value;
+  if(!desc||!precio||!fecha){toast('Completa los campos obligatorios','e');return;}
   const cliVal=document.getElementById('vCliente').value;
-  const data={lavadoraId:lavId,clienteId:cliVal?Number(cliVal):null,comprador:cliVal?'':document.getElementById('vNombre').value.trim(),fecha,precio,metodo:document.getElementById('vMetodo').value,notas:document.getElementById('vNotas').value};
+  const data={descripcion:desc,clienteId:cliVal?Number(cliVal):null,comprador:cliVal?'':document.getElementById('vNombre').value.trim(),fecha,precio,metodo:document.getElementById('vMetodo').value,notas:document.getElementById('vNotas').value};
   if(id){
-    const old=db.ventas.find(v=>v.id==id);
-    if(old&&old.lavadoraId!==lavId)db.lavadoras=db.lavadoras.map(l=>l.id===old.lavadoraId?{...l,estado:'Disponible'}:l);
     db.ventas=db.ventas.map(v=>v.id==id?{...v,...data}:v);toast('Venta actualizada');
   }else{
     db.ventas.push({id:nextId(db.ventas),...data});toast('Venta registrada ✓');
   }
-  db.lavadoras=db.lavadoras.map(l=>l.id===lavId?{...l,estado:'Vendida'}:l);
   closeModal('modal-venta');await persist();renderPage();
 }
 async function delVenta(id){
@@ -1441,7 +1436,7 @@ function verVenta(id){
   const v=db.ventas.find(x=>x.id===id);if(!v)return;
   const l=db.lavadoras.find(x=>x.id===v.lavadoraId);
   document.getElementById('mDetTitle').textContent=`Venta #${v.id}`;
-  document.getElementById('mDetBody').innerHTML=[['Lavadora',l?`${l.num} · ${l.marca} ${l.modelo||''}`:'—'],['Capacidad',l&&l.cap?l.cap+' kg':'—'],['Comprador',(v.clienteId?'#'+v.clienteId+' · ':'')+ventaComprador(v)],['Fecha',v.fecha],['Precio',fmtMXN(v.precio)],['Método',v.metodo||'—'],['Notas',v.notas||'—']].map(([k,x])=>`<div class="detail-row"><span class="dk">${k}</span><span class="dv">${x}</span></div>`).join('');
+  document.getElementById('mDetBody').innerHTML=[['Lavadora',v.descripcion||(l?`${l.num} · ${l.marca} ${l.modelo||''}`:'—')],['Comprador',(v.clienteId?'#'+v.clienteId+' · ':'')+ventaComprador(v)],['Fecha',v.fecha],['Precio',fmtMXN(v.precio)],['Método',v.metodo||'—'],['Notas',v.notas||'—']].map(([k,x])=>`<div class="detail-row"><span class="dk">${k}</span><span class="dv">${x}</span></div>`).join('');
   document.getElementById('mDetFoot').innerHTML=`<button class="btn btn-secondary" onclick="closeModal('modal-detalle')">Cerrar</button><button class="btn btn-primary" onclick="closeModal('modal-detalle');editVenta(${id})">✏️ Editar</button>`;
   openModal('modal-detalle');
 }
